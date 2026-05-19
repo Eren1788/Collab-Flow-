@@ -28,3 +28,6 @@ mybatis-plus:
 
 knife4j:
   enable: true
+
+file:
+  upload-path: E:/collabflow/upload
