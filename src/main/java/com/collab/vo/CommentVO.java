@@ -3,15 +3,15 @@ package com.collab.vo;
 import lombok.Data;
 
 @Data
-public class UserVO {
+public class CommentVO {
 
     private Long id;
 
-    private String username;
+    private String content;
 
     private String nickname;
 
     private String avatar;
 
-    private String role;
+    private String createTime;
 }

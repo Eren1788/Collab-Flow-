@@ -8,23 +8,25 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("project")
-public class Project {
+@TableName("file_info")
+public class FileInfo {
 
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    private Long taskId;
+
+    private Long projectId;
+
     private String name;
 
-    private String description;
+    private String url;
 
-    private Long creatorId;
+    private Long fileSize;
 
-    private Integer status;
+    private String fileType;
 
-    private LocalDateTime startTime;
+    private Long uploaderId;
 
-    private LocalDateTime endTime;
-
-    private LocalDateTime createTime;
+    private LocalDateTime uploadTime;
 }

@@ -1,5 +1,6 @@
 package com.collab.entity;
 
+import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -10,7 +11,7 @@ import java.time.LocalDateTime;
 @TableName("comment")
 public class Comment {
 
-    @TableId
+    @TableId(type = IdType.AUTO)
     private Long id;
 
     private Long taskId;
@@ -18,6 +19,8 @@ public class Comment {
     private Long userId;
 
     private String content;
+
+    private Long parentId;
 
     private LocalDateTime createTime;
 }

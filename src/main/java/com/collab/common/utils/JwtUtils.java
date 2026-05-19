@@ -9,8 +9,8 @@ import java.util.Date;
  */
 public class JwtUtils {
 
-    //密钥
-    private static final String SECRET = "collab-flow-secret";
+    //密钥（Base64编码，至少256位/32字节）
+    private static final String SECRET = "Y29sbGFiLWZsb3ctc2VjcmV0LWtleS1mb3ItanN3LWF1dGg=";
     // 过期时间（7天）
     private static final long EXPIRE = 7 * 24 * 60 * 60 * 1000;
 
@@ -24,7 +24,7 @@ public class JwtUtils {
                 .claim("username",username)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis()+EXPIRE))
-                .signWith(SignatureAlgorithm.ES256,SECRET)
+                .signWith(SignatureAlgorithm.HS256,SECRET)
                 .compact();
     }
 

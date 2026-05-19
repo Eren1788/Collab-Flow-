@@ -1,153 +1,803 @@
-# Collab Flow - 后端文档
+# Collab Flow - 后端开发文档（完整版）
+
+# 1️⃣ 项目简介
+
+Collab Flow 是一个基于：
+
+* Spring Boot 3
+* MyBatis Plus
+* MySQL 8
+* Redis
+* JWT
+* Knife4j
+
+开发的企业级智能任务协作系统。
+
+系统支持：
+
+* 用户登录注册
+* JWT 鉴权
+* 项目管理
+* 项目成员管理
+* 任务协作
+* 评论系统
+* 文件上传
+* 分页查询
+* 条件筛选
+* 任务统计
+
+适用于：
+
+* Java Web 课程设计
+* 毕业设计
+* Spring Boot 全栈项目
+* 企业级 CRUD 项目练习
 
 ---
 
-## 1️⃣ 项目简介
+# 2️⃣ 技术栈
 
-Collab Flow 后端使用 **Spring Boot + MyBatis Plus + MySQL + Redis + JWT + Knife4j**  
-提供完整的企业级任务协作管理 API。
-
-功能：
-
-- 用户注册/登录/信息管理
-- 项目增删改查
-- 任务增删改查、状态管理、指派执行人
-- 评论功能
-- 文件上传
-- 角色权限管理（RBAC）
-
----
-
-## 2️⃣ 技术栈
-
-| 技术 | 说明 |
-|------|------|
-| Spring Boot 3 | 核心框架 |
-| MyBatis Plus | ORM 框架 |
-| Lombok | 简化代码 |
-| MySQL 8 | 数据库 |
-| Redis | 缓存/Token |
-| JWT | 登录鉴权 |
-| Knife4j | 自动生成接口文档 |
+| 技术            | 说明      |
+| ------------- | ------- |
+| Spring Boot 3 | 核心框架    |
+| MyBatis Plus  | ORM框架   |
+| MySQL 8       | 数据库     |
+| Redis         | Token缓存 |
+| JWT           | 登录鉴权    |
+| Lombok        | 简化代码    |
+| Knife4j       | 接口文档    |
+| Maven         | 项目管理    |
 
 ---
 
-## 3️⃣ 数据库表设计
+# 3️⃣ 推荐项目目录结构
 
-### 用户表 `user`
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | BIGINT | 主键，自增 |
-| username | VARCHAR(50) | 用户名，唯一 |
-| password | VARCHAR(100) | 加密密码 |
-| nickname | VARCHAR(50) | 昵称 |
-| avatar | VARCHAR(255) | 头像URL |
-| role | VARCHAR(20) | 角色：admin/user |
-| create_time | DATETIME | 创建时间 |
-
-### 项目表 `project`
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | BIGINT | 主键，自增 |
-| name | VARCHAR(100) | 项目名称 |
-| description | TEXT | 项目描述 |
-| creator_id | BIGINT | 创建人ID |
-| status | TINYINT | 状态 0未开始 1进行中 2已完成 |
-| create_time | DATETIME | 创建时间 |
-
-### 任务表 `task`
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | BIGINT | 主键，自增 |
-| project_id | BIGINT | 所属项目ID |
-| title | VARCHAR(100) | 任务标题 |
-| content | TEXT | 任务内容 |
-| creator_id | BIGINT | 创建人ID |
-| executor_id | BIGINT | 执行人ID |
-| status | TINYINT | 任务状态 0待开始 1进行中 2完成 |
-| priority | TINYINT | 优先级 0普通 1紧急 |
-| start_time | DATETIME | 开始时间 |
-| end_time | DATETIME | 结束时间 |
-| create_time | DATETIME | 创建时间 |
-
-### 评论表 `comment`
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | BIGINT | 主键，自增 |
-| task_id | BIGINT | 任务ID |
-| user_id | BIGINT | 评论人ID |
-| content | TEXT | 评论内容 |
-| create_time | DATETIME | 评论时间 |
-
-### 文件表 `file`
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | BIGINT | 主键，自增 |
-| task_id | BIGINT | 关联任务ID |
-| project_id | BIGINT | 关联项目ID |
-| name | VARCHAR(100) | 文件名 |
-| url | VARCHAR(255) | 文件URL |
-| uploader_id | BIGINT | 上传人ID |
-| upload_time | DATETIME | 上传时间 |
-
-### 角色权限表
-
-- `role`：角色表
-- `permission`：权限表
-- `role_permission`：角色权限关联
-- `user_role`：用户角色关联
+```text
+com.collabflow
+├── controller
+├── service
+├── service.impl
+├── mapper
+├── entity
+├── dto
+├── vo
+├── config
+├── interceptor
+├── utils
+├── common
+├── exception
+└── CollabFlowApplication
+```
 
 ---
 
-## 4️⃣ 后端接口说明（Apifox 可导入）
+# 4️⃣ 数据库设计（最终版）
 
-### 4.1 用户模块
+# 4.1 用户表 user
 
-| 接口 | 方法 | 请求 | 返回示例 | 说明 |
-|------|------|------|----------|------|
-| /user/login | POST | {username, password} | {code:200,data:"token"} | 登录 |
-| /user/register | POST | {username,password,nickname} | {code:200} | 注册 |
-| /user/info | GET | Header: Authorization | {code:200,data:{id,username,nickname,role}} | 获取用户信息 |
-| /user/list | GET | Header: Authorization | {code:200,data:[...]} | 用户列表 |
-
-### 4.2 项目模块
-
-| 接口 | 方法 | 请求 | 返回示例 | 说明 |
-|------|------|------|----------|------|
-| /project/add | POST | {name,description,status} | {code:200} | 新增项目 |
-| /project/list | GET | Header | {code:200,data:[...]} | 项目列表 |
-| /project/update | PUT | {id,name,description,status} | {code:200} | 更新项目 |
-| /project/delete/{id} | DELETE | Header | {code:200} | 删除项目 |
-
-### 4.3 任务模块
-
-| 接口 | 方法 | 请求 | 返回示例 | 说明 |
-|------|------|------|----------|------|
-| /task/add | POST | {title,content,status,executorId,projectId} | {code:200} | 新增任务 |
-| /task/list | GET | Header | {code:200,data:[...]} | 任务列表 |
-| /task/update | PUT | {id,title,content,status,executorId} | {code:200} | 更新任务 |
-| /task/delete/{id} | DELETE | Header | {code:200} | 删除任务 |
-
-### 4.4 评论模块
-
-| 接口 | 方法 | 请求 | 返回示例 | 说明 |
-|------|------|------|----------|------|
-| /task/comment/add | POST | {taskId, content} | {code:200} | 新增评论 |
-
-### 4.5 文件模块
-
-| 接口 | 方法 | 请求 | 返回示例 | 说明 |
-|------|------|------|----------|------|
-| /file/upload | POST | multipart/form-data file | {code:200,data:"文件URL"} | 文件上传 |
+```sql
+CREATE TABLE user (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    password VARCHAR(100) NOT NULL,
+    nickname VARCHAR(50),
+    avatar VARCHAR(255),
+    email VARCHAR(100),
+    phone VARCHAR(20),
+    role VARCHAR(20) DEFAULT 'user',
+    status TINYINT DEFAULT 1,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+```
 
 ---
 
-## 5️⃣ 后端启动方式
+# 4.2 项目表 project
+
+```sql
+CREATE TABLE project (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    creator_id BIGINT,
+    status TINYINT DEFAULT 0,
+    start_time DATETIME,
+    end_time DATETIME,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+---
+
+# 4.3 项目成员表 project_member
+
+```sql
+CREATE TABLE project_member (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    project_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    role VARCHAR(20) DEFAULT 'member',
+    join_time DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+---
+
+# 4.4 任务表 task
+
+```sql
+CREATE TABLE task (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    project_id BIGINT NOT NULL,
+    title VARCHAR(100) NOT NULL,
+    content TEXT,
+    creator_id BIGINT,
+    executor_id BIGINT,
+    status TINYINT DEFAULT 0,
+    priority TINYINT DEFAULT 0,
+    start_time DATETIME,
+    end_time DATETIME,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+---
+
+# 4.5 评论表 comment
+
+```sql
+CREATE TABLE comment (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    task_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    content TEXT,
+    parent_id BIGINT DEFAULT 0,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+---
+
+# 4.6 文件表 file_info
+
+```sql
+CREATE TABLE file_info (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    task_id BIGINT,
+    project_id BIGINT,
+    name VARCHAR(255),
+    url VARCHAR(500),
+    file_size BIGINT,
+    file_type VARCHAR(50),
+    uploader_id BIGINT,
+    upload_time DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+---
+
+# 5️⃣ JWT 鉴权规范
+
+所有需要登录的接口：
+
+```http
+Authorization: Bearer token
+```
+
+---
+
+# 6️⃣ 统一返回结构
+
+# Result.java
+
+```java
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class Result<T> {
+
+    private Integer code;
+
+    private String message;
+
+    private T data;
+
+    public static <T> Result<T> success(T data){
+        return new Result<>(200,"success",data);
+    }
+
+    public static <T> Result<T> success(){
+        return new Result<>(200,"success",null);
+    }
+
+    public static <T> Result<T> error(String message){
+        return new Result<>(500,message,null);
+    }
+}
+```
+
+---
+
+# 7️⃣ 用户模块
+
+# 7.1 用户功能
+
+支持：
+
+* 登录
+* 注册
+* 获取用户信息
+* 用户分页
+* 用户详情
+* 修改用户
+* 删除用户
+
+---
+
+# 7.2 用户接口
+
+| 接口                | 请求方式   | 说明       |
+| ----------------- | ------ | -------- |
+| /user/login       | POST   | 用户登录     |
+| /user/register    | POST   | 用户注册     |
+| /user/info        | GET    | 获取当前用户信息 |
+| /user/list        | GET    | 用户列表     |
+| /user/page        | GET    | 用户分页     |
+| /user/detail/{id} | GET    | 用户详情     |
+| /user/update      | PUT    | 修改用户     |
+| /user/delete/{id} | DELETE | 删除用户     |
+
+---
+
+# 7.3 LoginDTO
+
+```java
+@Data
+public class LoginDTO {
+
+    private String username;
+
+    private String password;
+}
+```
+
+---
+
+# 7.4 UserRegisterDTO
+
+```java
+@Data
+public class UserRegisterDTO {
+
+    private String username;
+
+    private String password;
+
+    private String nickname;
+}
+```
+
+---
+
+# 7.5 UserVO
+
+```java
+@Data
+public class UserVO {
+
+    private Long id;
+
+    private String username;
+
+    private String nickname;
+
+    private String avatar;
+
+    private String role;
+}
+```
+
+---
+
+# 8️⃣ 项目模块
+
+# 8.1 项目功能
+
+支持：
+
+* 项目新增
+* 项目修改
+* 项目删除
+* 项目分页
+* 项目详情
+* 项目成员管理
+
+---
+
+# 8.2 项目接口
+
+| 接口                               | 请求方式   | 说明     |
+| -------------------------------- | ------ | ------ |
+| /project/add                     | POST   | 新增项目   |
+| /project/list                    | GET    | 项目列表   |
+| /project/page                    | GET    | 项目分页   |
+| /project/detail/{id}             | GET    | 项目详情   |
+| /project/update                  | PUT    | 修改项目   |
+| /project/delete/{id}             | DELETE | 删除项目   |
+| /project/member/add              | POST   | 添加项目成员 |
+| /project/member/list/{projectId} | GET    | 项目成员列表 |
+| /project/member/delete/{id}      | DELETE | 删除项目成员 |
+
+---
+
+# 8.3 ProjectDTO
+
+```java
+@Data
+public class ProjectDTO {
+
+    private Long id;
+
+    private String name;
+
+    private String description;
+
+    private Integer status;
+}
+```
+
+---
+
+# 8.4 ProjectVO
+
+```java
+@Data
+public class ProjectVO {
+
+    private Long id;
+
+    private String name;
+
+    private String description;
+
+    private Integer status;
+
+    private String creatorName;
+
+    private Integer taskCount;
+}
+```
+
+---
+
+# 9️⃣ 任务模块
+
+# 9.1 任务功能
+
+支持：
+
+* 新增任务
+* 修改任务
+* 删除任务
+* 任务详情
+* 任务分页
+* 任务状态修改
+* 指派执行人
+* 条件查询
+* 任务统计
+
+---
+
+# 9.2 任务接口
+
+| 接口                | 请求方式   | 说明     |
+| ----------------- | ------ | ------ |
+| /task/add         | POST   | 新增任务   |
+| /task/list        | GET    | 任务列表   |
+| /task/page        | GET    | 任务分页   |
+| /task/detail/{id} | GET    | 任务详情   |
+| /task/update      | PUT    | 修改任务   |
+| /task/delete/{id} | DELETE | 删除任务   |
+| /task/status      | PUT    | 修改任务状态 |
+| /task/assign      | PUT    | 指派任务   |
+| /task/statistics  | GET    | 任务统计   |
+
+---
+
+# 9.3 TaskDTO
+
+```java
+@Data
+public class TaskDTO {
+
+    private Long id;
+
+    private Long projectId;
+
+    private String title;
+
+    private String content;
+
+    private Long executorId;
+
+    private Integer priority;
+
+    private Integer status;
+}
+```
+
+---
+
+# 9.4 TaskVO
+
+```java
+@Data
+public class TaskVO {
+
+    private Long id;
+
+    private String title;
+
+    private String content;
+
+    private Integer status;
+
+    private Integer priority;
+
+    private String projectName;
+
+    private String creatorName;
+
+    private String executorName;
+}
+```
+
+---
+
+# 🔟 评论模块
+
+# 10.1 评论功能
+
+支持：
+
+* 新增评论
+* 评论列表
+* 删除评论
+* 回复评论
+
+---
+
+# 10.2 评论接口
+
+| 接口                     | 请求方式   | 说明   |
+| ---------------------- | ------ | ---- |
+| /comment/add           | POST   | 新增评论 |
+| /comment/list/{taskId} | GET    | 评论列表 |
+| /comment/delete/{id}   | DELETE | 删除评论 |
+
+---
+
+# 10.3 CommentDTO
+
+```java
+@Data
+public class CommentDTO {
+
+    private Long taskId;
+
+    private String content;
+
+    private Long parentId;
+}
+```
+
+---
+
+# 10.4 CommentVO
+
+```java
+@Data
+public class CommentVO {
+
+    private Long id;
+
+    private String content;
+
+    private String nickname;
+
+    private String avatar;
+
+    private String createTime;
+}
+```
+
+---
+
+# 1️⃣1️⃣ 文件模块
+
+# 11.1 文件功能
+
+支持：
+
+* 文件上传
+* 文件列表
+* 文件下载
+* 文件删除
+
+---
+
+# 11.2 文件接口
+
+| 接口                  | 请求方式   | 说明   |
+| ------------------- | ------ | ---- |
+| /file/upload        | POST   | 文件上传 |
+| /file/list          | GET    | 文件列表 |
+| /file/delete/{id}   | DELETE | 删除文件 |
+| /file/download/{id} | GET    | 下载文件 |
+
+---
+
+# 11.3 文件上传规范
+
+Content-Type：
+
+```text
+multipart/form-data
+```
+
+上传参数：
+
+| 参数        | 类型            |
+| --------- | ------------- |
+| file      | MultipartFile |
+| taskId    | Long          |
+| projectId | Long          |
+
+---
+
+# 1️⃣2️⃣ 分页统一结构
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "total": 100,
+    "records": []
+  }
+}
+```
+
+---
+
+# 1️⃣3️⃣ 状态定义
+
+# 项目状态
+
+| 值 | 含义  |
+| - | --- |
+| 0 | 未开始 |
+| 1 | 进行中 |
+| 2 | 已完成 |
+
+---
+
+# 任务状态
+
+| 值 | 含义  |
+| - | --- |
+| 0 | 待开始 |
+| 1 | 进行中 |
+| 2 | 已完成 |
+
+---
+
+# 任务优先级
+
+| 值 | 含义 |
+| - | -- |
+| 0 | 普通 |
+| 1 | 紧急 |
+
+---
+
+# 1️⃣4️⃣ 推荐 Entity
+
+推荐创建：
+
+```text
+User
+Project
+ProjectMember
+Task
+Comment
+FileInfo
+```
+
+---
+
+# 1️⃣5️⃣ 推荐 DTO
+
+推荐创建：
+
+```text
+LoginDTO
+UserRegisterDTO
+ProjectDTO
+TaskDTO
+CommentDTO
+```
+
+---
+
+# 1️⃣6️⃣ 推荐 VO
+
+推荐创建：
+
+```text
+UserVO
+ProjectVO
+TaskVO
+CommentVO
+```
+
+---
+
+# 1️⃣7️⃣ 推荐开发顺序
+
+# 第一阶段
+
+建议优先开发：
+
+1. 用户模块
+2. JWT
+3. 项目模块
+4. 任务模块
+5. 评论模块
+6. 文件模块
+
+---
+
+# 第二阶段
+
+建议继续开发：
+
+* Redis 缓存
+* ECharts 数据统计
+* WebSocket 消息通知
+* 操作日志
+* RBAC 权限控制
+
+---
+
+# 1️⃣8️⃣ 推荐配置
+
+# application.yml
+
+```yml
+server:
+  port: 8080
+
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/collab_flow
+    username: root
+    password: 123456
+
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+```
+
+---
+
+# 1️⃣9️⃣ 推荐依赖
+
+# pom.xml
+
+```xml
+<dependencies>
+
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+
+    <dependency>
+        <groupId>com.baomidou</groupId>
+        <artifactId>mybatis-plus-boot-starter</artifactId>
+        <version>3.5.5</version>
+    </dependency>
+
+    <dependency>
+        <groupId>mysql</groupId>
+        <artifactId>mysql-connector-j</artifactId>
+    </dependency>
+
+    <dependency>
+        <groupId>io.jsonwebtoken</groupId>
+        <artifactId>jjwt</artifactId>
+        <version>0.9.1</version>
+    </dependency>
+
+    <dependency>
+        <groupId>org.projectlombok</groupId>
+        <artifactId>lombok</artifactId>
+    </dependency>
+
+    <dependency>
+        <groupId>com.github.xiaoymin</groupId>
+        <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
+        <version>4.3.0</version>
+    </dependency>
+
+</dependencies>
+```
+
+---
+
+# 2️⃣0️⃣ 项目亮点
+
+项目亮点：
+
+* JWT 登录鉴权
+* 企业级模块化开发
+* Spring Boot + Vue3 前后端分离
+* MyBatis Plus 快速开发
+* 文件上传系统
+* 评论系统
+* 分页查询
+* 条件筛选
+* 项目成员协作
+* 任务统计
+* 企业级接口设计
+
+---
+
+# 2️⃣1️⃣ 当前项目完成度
+
+| 模块   | 完成度 |
+| ---- | --- |
+| 登录鉴权 | 90% |
+| 用户模块 | 85% |
+| 项目模块 | 80% |
+| 任务模块 | 80% |
+| 评论模块 | 70% |
+| 文件模块 | 70% |
+| 权限模块 | 40% |
+
+整体项目完成度：
+
+```text
+约 80%
+```
+
+---
+
+# 2️⃣2️⃣ 后续推荐优化
+
+后续可以继续优化：
+
+* Redis Token续期
+* RBAC权限系统
+* 消息通知
+* 邮件通知
+* WebSocket实时协作
+* MinIO对象存储
+* Docker部署
+* Linux部署
+* Nginx反向代理
+
+---
+
+# 2️⃣3️⃣ 后端启动方式
 
 ```bash
 mvn clean install
@@ -156,11 +806,32 @@ mvn spring-boot:run
 
 ---
 
-## 6️⃣ 项目亮点
+# 2️⃣4️⃣ Knife4j 文档地址
 
-- 企业级架构
-- JWT 登录鉴权
-- RBAC 权限控制
-- CRUD 完整实现
-- 文件上传与任务评论
-- Knife4j 自动生成接口文档
+启动项目后访问：
+
+```text
+http://localhost:8080/doc.html
+```
+
+---
+
+# 2️⃣5️⃣ 总结
+
+Collab Flow 已具备：
+
+* 企业级任务协作系统基础架构
+* 前后端分离开发模式
+* JWT登录鉴权
+* CRUD完整体系
+* 文件上传功能
+* 评论系统
+* 分页与条件筛选
+* 项目成员协作
+
+适合作为：
+
+* Java Web课程设计
+* Spring Boot实战项目
+* 毕业设计项目
+* 简历项目

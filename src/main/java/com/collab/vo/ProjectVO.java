@@ -2,8 +2,6 @@ package com.collab.vo;
 
 import lombok.Data;
 
-import java.time.LocalDateTime;
-
 @Data
 public class ProjectVO {
 
@@ -13,13 +11,9 @@ public class ProjectVO {
 
     private String description;
 
-    private String creatorName;
-
     private Integer status;
 
-    private LocalDateTime startTime;
+    private String creatorName;
 
-    private LocalDateTime endTime;
-
-    private LocalDateTime createTime;
+    private Integer taskCount;
 }
