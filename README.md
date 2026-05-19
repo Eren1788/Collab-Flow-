@@ -5,7 +5,7 @@
 ## 1️⃣ 项目简介
 
 Collab Flow 是一个企业级任务协作管理平台，功能类似简化版 Jira/Trello，主要面向团队项目管理。  
-该项目主要功能包括：
+主要功能包括：
 
 - 用户注册、登录、信息管理（JWT 鉴权）
 - 项目增删改查
@@ -32,7 +32,7 @@ Collab Flow 是一个企业级任务协作管理平台，功能类似简化版 J
 
 ## 3️⃣ 后端数据库表设计
 
-### 3.1 用户表 `user`
+### 用户表 `user`
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -44,7 +44,7 @@ Collab Flow 是一个企业级任务协作管理平台，功能类似简化版 J
 | role | VARCHAR(20) | 角色：admin/user |
 | create_time | DATETIME | 创建时间 |
 
-### 3.2 项目表 `project`
+### 项目表 `project`
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -55,7 +55,7 @@ Collab Flow 是一个企业级任务协作管理平台，功能类似简化版 J
 | status | TINYINT | 状态：0未开始 1进行中 2已完成 |
 | create_time | DATETIME | 创建时间 |
 
-### 3.3 任务表 `task`
+### 任务表 `task`
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -71,7 +71,7 @@ Collab Flow 是一个企业级任务协作管理平台，功能类似简化版 J
 | end_time | DATETIME | 结束时间 |
 | create_time | DATETIME | 创建时间 |
 
-### 3.4 评论表 `comment`
+### 评论表 `comment`
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -81,7 +81,7 @@ Collab Flow 是一个企业级任务协作管理平台，功能类似简化版 J
 | content | TEXT | 评论内容 |
 | create_time | DATETIME | 评论时间 |
 
-### 3.5 文件表 `file`
+### 文件表 `file`
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -93,7 +93,7 @@ Collab Flow 是一个企业级任务协作管理平台，功能类似简化版 J
 | uploader_id | BIGINT | 上传人ID |
 | upload_time | DATETIME | 上传时间 |
 
-### 3.6 角色权限表
+### 角色权限表
 
 - `role` 表：角色表（admin/user）
 - `permission` 表：权限表（user:add, project:edit等）
@@ -104,7 +104,7 @@ Collab Flow 是一个企业级任务协作管理平台，功能类似简化版 J
 
 ## 4️⃣ 后端接口说明
 
-### 4.1 用户模块
+### 用户模块
 
 | 接口 | 方法 | 请求参数 | 返回示例 | 说明 |
 |------|------|----------|----------|------|
@@ -113,7 +113,7 @@ Collab Flow 是一个企业级任务协作管理平台，功能类似简化版 J
 | /user/info | GET | Header Authorization | `{ "code":200,"data":{id,username,nickname,role}}` | 获取用户信息 |
 | /user/list | GET | Authorization | `{ "code":200,"data":[...] }` | 用户列表 |
 
-### 4.2 项目模块
+### 项目模块
 
 | 接口 | 方法 | 请求参数 | 返回示例 | 说明 |
 |------|------|----------|----------|------|
@@ -122,7 +122,7 @@ Collab Flow 是一个企业级任务协作管理平台，功能类似简化版 J
 | /project/update | PUT | `{ "id":1,"name":"xxx" }` | `{ "code":200 }` | 编辑项目 |
 | /project/delete/{id} | DELETE | Authorization | `{ "code":200 }` | 删除项目 |
 
-### 4.3 任务模块
+### 任务模块
 
 | 接口 | 方法 | 请求参数 | 返回示例 | 说明 |
 |------|------|----------|----------|------|
@@ -131,13 +131,13 @@ Collab Flow 是一个企业级任务协作管理平台，功能类似简化版 J
 | /task/update | PUT | `{ "id":1,"title":"xxx" }` | `{ "code":200 }` | 编辑任务 |
 | /task/delete/{id} | DELETE | Authorization | `{ "code":200 }` | 删除任务 |
 
-### 4.4 评论模块
+### 评论模块
 
 | 接口 | 方法 | 请求参数 | 返回示例 | 说明 |
 |------|------|----------|----------|------|
 | /task/comment/add | POST | `{ "taskId":1,"content":"xxx" }` | `{ "code":200 }` | 新增评论 |
 
-### 4.5 文件模块
+### 文件模块
 
 | 接口 | 方法 | 请求参数 | 返回示例 | 说明 |
 |------|------|----------|----------|------|
@@ -147,114 +147,111 @@ Collab Flow 是一个企业级任务协作管理平台，功能类似简化版 J
 
 ## 5️⃣ 前端目录结构
 
-```text
+```
 src/
 ├── main.ts
 ├── App.vue
-├── router/index.ts
-├── store/user.ts
-├── utils/request.ts
+├── router/
+│   └── index.ts
+├── store/
+│   └── user.ts
+├── utils/
+│   └── request.ts
 ├── views/
-│   ├── Login.vue
-│   ├── Home.vue
-│   ├── UserList.vue
-│   ├── ProjectList.vue
-│   └── TaskList.vue
-└── components/Layout/
-    ├── Header.vue
-    └── Sidebar.vue
+│   ├── Login.vue        # 登录页
+│   ├── Home.vue         # 后台布局页 (集成 Header/Sidebar/Footer)
+│   ├── UserList.vue     # 用户列表页
+│   ├── ProjectList.vue  # 项目列表页
+│   └── TaskList.vue     # 任务列表页
+└── components/
+    └── Layout/
+        ├── Header.vue   # 顶部导航 + 用户信息 + 退出按钮
+        ├── Sidebar.vue  # 左侧菜单导航
+        └── Footer.vue   # 底部版权信息
 ```
 
 ---
 
-## 6️⃣ 前端页面说明
+## 6️⃣ 前端页面功能说明
 
-### 6.1 登录页 (Login.vue)
+### 6.1 核心页面逻辑
 
-- 用户输入用户名和密码
-- 调用 `/user/login` 接口
-- 成功后存储 token 并跳转首页
+| 页面 | 组件名 | 功能描述 |
+|------|--------|----------|
+| 登录页 | Login.vue | 输入用户名密码，调用 `/user/login`，成功后保存 Token 并跳转 |
+| 首页布局 | Home.vue | 集成布局组件，通过 `RouterView` 渲染子页面 |
+| 用户管理 | UserList.vue | 展示用户列表，调用 `/user/list` |
+| 项目管理 | ProjectList.vue | 项目的 CRUD 操作，状态管理 (0未开始/1进行中/2已完成) |
+| 任务管理 | TaskList.vue | 任务的 CRUD 操作，支持从用户列表选择执行人 |
 
-### 6.2 首页 (Home.vue)
+### 6.2 关键模块实现
 
-- 顶部 Header + 左侧 Sidebar + 内容区域
-- 使用 `<router-view>` 渲染列表页
+#### Axios 请求封装 (`utils/request.ts`)
+```typescript
+import axios from 'axios'
+import type { AxiosRequestConfig } from 'axios'
+import { useUserStore } from '../store/user'
 
-### 6.3 用户列表 (UserList.vue)
+const request = axios.create({
+  baseURL: 'http://localhost:8080',
+  timeout: 5000
+})
 
-- 表格显示用户信息
-- 调用 `/user/list` 获取数据
+request.interceptors.request.use(config => {
+  const userStore = useUserStore()
+  if (userStore.token) {
+    config.headers = config.headers || {}
+    config.headers['Authorization'] = `Bearer ${userStore.token}`
+  }
+  return config
+})
 
-### 6.4 项目管理 (ProjectList.vue)
+request.interceptors.response.use(
+  res => res.data,
+  err => Promise.reject(err)
+)
 
-- 表格显示项目
-- 支持新增、编辑、删除
-- 调用 `/project/add`, `/project/update`, `/project/delete/{id}`
+export const requestWithType = <T = any>(config: AxiosRequestConfig) => {
+  return request(config) as Promise<T>
+}
 
-### 6.5 任务管理 (TaskList.vue)
-
-- 表格显示任务
-- 支持新增、编辑、删除
-- 调用 `/task/add`, `/task/update`, `/task/delete/{id}`
-- 可以选择执行人（调用 `/user/list`）
+export default request
+```
 
 ---
 
-## 7️⃣ 启动方式
+## 7️⃣ 项目启动方式
 
-### 7.1 后端启动
-
+### 后端启动
 ```bash
 mvn clean install
 mvn spring-boot:run
 ```
+访问地址：`http://localhost:8080`
 
-访问接口：http://localhost:8080
-
-### 7.2 前端启动
-
+### 前端启动
 ```bash
 npm install
 npm run dev
 ```
-
-访问页面：http://localhost:5173
-
----
-
-## 8️⃣ 核心代码示例
-
-### 8.1 Axios 封装
-
-```typescript
-// src/utils/request.ts
-import axios from 'axios'
-
-const request = axios.create({ baseURL: 'http://localhost:8080', timeout: 5000 })
-
-// GET 用户列表
-const res = await request.get('/user/list')
-
-// POST 登录
-const loginRes = await request.post('/user/login', { username:'admin', password:'123456' })
-```
+访问地址：`http://localhost:5173`
 
 ---
 
-## 9️⃣ 项目亮点
+## 8️⃣ 项目亮点
 
 - 企业级前后端分离架构
-- JWT 登录鉴权、RBAC 权限控制
-- CRUD 完整实现
-- 文件上传与任务评论
-- 前端使用 Element Plus + Pinia + Vue Router
-- 后端 MyBatis Plus + Redis + Knife4j 接口文档
+- JWT 登录鉴权与 RBAC 权限控制
+- 完整的 CRUD 业务实现（用户/项目/任务）
+- 文件上传与任务评论功能
+- 前端：Vue 3 + Element Plus + Pinia + TypeScript
+- 后端：Spring Boot 3 + MyBatis Plus + Redis + Knife4j
 
 ---
 
-## 🔟 后续扩展建议
+## 9️⃣ 后续扩展建议
 
 - WebSocket 实时任务通知
-- 邮件/消息提醒
-- Excel 导出任务和项目
-- Docker 部署
+- 邮件或站内消息提醒
+- 任务和项目数据 Excel 导出
+- Docker 容器化部署

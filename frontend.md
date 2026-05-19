@@ -4,14 +4,16 @@
 
 ## 1️⃣ 项目简介
 
-Collab Flow 前端使用 **Vue3 + Vite + Element Plus + Pinia + Axios**  
-提供后台管理界面，支持：
+Collab Flow 前端使用 **Vue3 + TypeScript + Vite + Element Plus + Pinia**  
+提供企业级后台管理界面，与 Spring Boot 后端接口联调。
 
-- 登录、Token 存储
-- 首页布局 + 左侧菜单 + 路由
-- 用户列表、项目列表、任务列表
-- 新增/编辑/删除功能
-- 前后端接口调用
+功能：
+
+- 用户登录/退出
+- 用户列表展示
+- 项目增删改查
+- 任务增删改查、指派执行人
+- 响应式布局（Header + Sidebar + Footer）
 
 ---
 
@@ -19,127 +21,130 @@ Collab Flow 前端使用 **Vue3 + Vite + Element Plus + Pinia + Axios**
 
 | 技术 | 说明 |
 |------|------|
-| Vue3 | 前端核心框架 |
-| Vite | 构建工具 |
-| Element Plus | UI组件库 |
+| Vue 3 | 核心框架 (Composition API) |
+| TypeScript | 类型安全 |
+| Vite | 快速构建工具 |
+| Element Plus | UI 组件库 |
 | Pinia | 状态管理 |
-| Axios | API 请求 |
-| TypeScript | 类型约束 |
-| Vue Router | 路由管理 |
+| Axios | HTTP 请求封装 |
+| Vue Router | 前端路由 |
 
 ---
 
 ## 3️⃣ 前端目录结构
 
-```text
+```
 src/
 ├── main.ts
 ├── App.vue
-├── router/index.ts
-├── store/user.ts
-├── utils/request.ts
+├── router/
+│   └── index.ts
+├── store/
+│   └── user.ts
+├── utils/
+│   └── request.ts
 ├── views/
-│   ├── Login.vue
-│   ├── Home.vue
-│   ├── UserList.vue
-│   ├── ProjectList.vue
-│   └── TaskList.vue
-└── components/Layout/
-    ├── Header.vue
-    └── Sidebar.vue
+│   ├── Login.vue        # 登录页
+│   ├── Home.vue         # 后台布局页 (集成 Header/Sidebar/Footer)
+│   ├── UserList.vue     # 用户列表页
+│   ├── ProjectList.vue  # 项目列表页
+│   └── TaskList.vue     # 任务列表页
+└── components/
+    └── Layout/
+        ├── Header.vue   # 顶部导航 + 用户信息 + 退出按钮
+        ├── Sidebar.vue  # 左侧菜单导航
+        └── Footer.vue   # 底部版权信息
 ```
 
 ---
 
-## 4️⃣ 页面功能说明
+## 4️⃣ 页面功能与逻辑
 
-### 4.1 登录页 (Login.vue)
+### 4.1 核心页面说明
 
-- 用户输入用户名和密码
-- 调用 `/user/login` 接口
-- 成功后存储 token 并跳转首页
+| 页面 | 路径/组件 | 功能描述 |
+|------|-----------|----------|
+| 登录页 | Login.vue | 输入用户名密码，调用 `/user/login`，成功后保存 Token 并跳转 |
+| 首页布局 | Home.vue | 集成布局组件，通过 `RouterView` 渲染子页面 |
+| 用户管理 | UserList.vue | 展示用户列表，调用 `/user/list` |
+| 项目管理 | ProjectList.vue | 项目的 CRUD 操作，状态管理 (0未开始/1进行中/2已完成) |
+| 任务管理 | TaskList.vue | 任务的 CRUD 操作，支持从用户列表选择执行人 |
 
-### 4.2 首页 (Home.vue)
+### 4.2 关键模块实现
 
-- 顶部 Header + 左侧 Sidebar + 内容区域
-- 通过 `<router-view>` 渲染列表页
+#### Pinia 状态管理 (`store/user.ts`)
+```typescript
+export const useUserStore = defineStore('user', {
+  state: () => ({
+    token: localStorage.getItem('token') || '',
+    info: {} as any
+  }),
+  actions: {
+    setToken(token: string) {
+      this.token = token
+      localStorage.setItem('token', token)
+    },
+    setUserInfo(info: any) {
+      this.info = info
+    },
+    logout() {
+      this.token = ''
+      this.info = {}
+      localStorage.removeItem('token')
+    }
+  }
+})
+```
 
-### 4.3 用户列表 (UserList.vue)
-
-- 表格显示用户信息
-- 调用 `/user/list` 接口
-
-### 4.4 项目管理 (ProjectList.vue)
-
-- 表格显示项目
-- 支持新增、编辑、删除
-- 调用 `/project/add`, `/project/update`, `/project/delete/{id}`
-
-### 4.5 任务管理 (TaskList.vue)
-
-- 表格显示任务
-- 支持新增、编辑、删除
-- 调用 `/task/add`, `/task/update`, `/task/delete/{id}`
-- 可以选择执行人（调用 `/user/list`）
-
----
-
-## 5️⃣ 核心代码示例
-
-### 5.1 Axios 封装
-
+#### Axios 请求封装 (`utils/request.ts`)
 ```typescript
 import axios from 'axios'
+import type { AxiosRequestConfig } from 'axios'
 import { useUserStore } from '../store/user'
 
-const request = axios.create({ baseURL: 'http://localhost:8080', timeout: 5000 })
+const request = axios.create({
+  baseURL: 'http://localhost:8080',
+  timeout: 5000
+})
 
 request.interceptors.request.use(config => {
   const userStore = useUserStore()
   if(userStore.token){
+    config.headers = config.headers || {}
     config.headers['Authorization'] = `Bearer ${userStore.token}`
   }
   return config
 })
 
-request.interceptors.response.use(res => res.data, err => Promise.reject(err))
+request.interceptors.response.use(
+  res => res.data,
+  err => Promise.reject(err)
+)
+
+export const requestWithType = <T = any>(config: AxiosRequestConfig) => {
+  return request(config) as Promise<T>
+}
 
 export default request
 ```
 
-### 5.2 接口调用示例
-
-```typescript
-// 登录
-const loginRes = await request.post('/user/login', {username:'admin', password:'123456'})
-
-// 获取用户列表
-const users = await request.get('/user/list')
-
-// 新增项目
-await request.post('/project/add', {name:'新项目', description:'测试', status:0})
-
-// 新增任务
-await request.post('/task/add', {title:'任务1', content:'描述', status:0, executorId:1, projectId:1})
-```
-
 ---
 
-## 6️⃣ 前端启动方式
+## 5️⃣ 前端启动方式
 
 ```bash
 npm install
 npm run dev
 ```
 
-访问页面：http://localhost:5173
+访问地址：`http://localhost:5173/`
 
 ---
 
-## 7️⃣ 项目亮点
+## 6️⃣ 项目亮点
 
-- 完整后台管理模板
-- 登录鉴权 + Token 自动存储
-- 左侧菜单 + 路由守卫
-- CRUD 操作示例
-- 前后端联调示例
+- Vue 3 Composition API + TypeScript 现代化开发
+- Pinia 全局状态管理与持久化
+- Axios 拦截器统一处理鉴权 Token
+- Element Plus 组件库快速构建 UI
+- 模块化目录结构，易于维护与扩展
