@@ -9,13 +9,21 @@ import TaskList from '../views/TaskList.vue'
 import CommentList from '../views/CommentList.vue'
 import FileList from '../views/FileList.vue'
 
+import { useUserStore } from '../store/user'
+
 const routes = [
 
+  /**
+   * 登录页
+   */
   {
     path:'/login',
     component:Login
   },
 
+  /**
+   * 首页布局
+   */
   {
     path:'/',
     component:Home,
@@ -24,27 +32,41 @@ const routes = [
 
     children:[
 
+      /**
+       * 用户管理
+       */
       {
         path:'users',
         component:UserList
       },
 
+      /**
+       * 项目管理
+       */
       {
         path:'projects',
         component:ProjectList
       },
 
+      /**
+       * 任务管理
+       */
       {
         path:'tasks',
         component:TaskList
       },
 
+      /**
+       * 评论管理
+       */
       {
         path:'comments',
         component:CommentList
       },
 
-      // 文件模块
+      /**
+       * 文件管理
+       */
       {
         path:'files',
         component:FileList
@@ -60,6 +82,51 @@ const router = createRouter({
   history:createWebHistory(),
 
   routes
+})
+
+/**
+ * 路由守卫
+ */
+router.beforeEach((to, from, next) => {
+
+  const userStore = useUserStore()
+
+  /**
+   * 未登录
+   */
+  if(
+
+    to.path !== '/login'
+
+    &&
+
+    !userStore.token
+
+  ){
+
+    next('/login')
+
+    return
+  }
+
+  /**
+   * 已登录
+   * 自动恢复WebSocket连接
+   */
+  if(
+
+    userStore.token
+
+    &&
+
+    userStore.info?.id
+
+  ){
+
+    userStore.connectWebSocket()
+  }
+
+  next()
 })
 
 export default router

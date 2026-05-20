@@ -2,19 +2,13 @@
 
   <div class="login-container">
 
-    <div class="login-box">
+    <el-card class="login-card">
 
-      <h2 class="title">
-        Collab Flow
-      </h2>
+      <h2 class="title">Collab Flow 登录</h2>
 
-      <el-form
-        :model="loginForm"
-        label-width="80px"
-        @keyup.enter="handleLogin"
-      >
+      <el-form :model="loginForm">
 
-        <el-form-item label="用户名">
+        <el-form-item>
 
           <el-input
             v-model="loginForm.username"
@@ -23,7 +17,7 @@
 
         </el-form-item>
 
-        <el-form-item label="密码">
+        <el-form-item>
 
           <el-input
             v-model="loginForm.password"
@@ -38,7 +32,7 @@
 
           <el-button
             type="primary"
-            style="width:100%;"
+            style="width:100%"
             @click="handleLogin"
           >
             登录
@@ -48,7 +42,7 @@
 
       </el-form>
 
-    </div>
+    </el-card>
 
   </div>
 
@@ -58,18 +52,23 @@
 
 import { reactive } from 'vue'
 
+import { useRouter } from 'vue-router'
+
 import { ElMessage } from 'element-plus'
 
-import { useRouter } from 'vue-router'
+import request from '../utils/request'
 
 import { useUserStore } from '../store/user'
 
-import { loginApi } from '../api/user'
+import websocket from '../utils/websocket'
 
 const router = useRouter()
 
 const userStore = useUserStore()
 
+/**
+ * 登录表单
+ */
 const loginForm = reactive({
 
   username:'',
@@ -77,37 +76,57 @@ const loginForm = reactive({
   password:''
 })
 
-const handleLogin = async ()=>{
-
-  if(!loginForm.username){
-
-    ElMessage.warning('请输入用户名')
-
-    return
-  }
-
-  if(!loginForm.password){
-
-    ElMessage.warning('请输入密码')
-
-    return
-  }
+/**
+ * 登录
+ */
+const handleLogin = async () => {
 
   try{
 
-    const res:any = await loginApi(loginForm)
+    /**
+     * 登录接口
+     */
+    const loginRes:any = await request({
 
-    const token = res.data.token
+      url:'/user/login',
 
-    userStore.setToken(token)
+      method:'post',
+
+      data:loginForm
+    })
+
+    /**
+     * 保存token
+     */
+    userStore.setToken(loginRes.data.token)
+
+    /**
+     * 获取用户信息
+     */
+    const userInfoRes:any = await request({
+
+      url:'/user/info',
+
+      method:'get'
+    })
+
+    /**
+     * 保存用户信息
+     */
+    userStore.setUserInfo(userInfoRes.data)
+
+    /**
+     * 建立WebSocket连接
+     */
+    websocket.connect(userInfoRes.data.id)
 
     ElMessage.success('登录成功')
 
-    router.push('/users')
+    router.push('/')
 
   }catch(error){
 
-    console.log(error)
+    console.error(error)
   }
 }
 
@@ -130,17 +149,11 @@ const handleLogin = async ()=>{
   background:#f5f7fa;
 }
 
-.login-box{
+.login-card{
 
-  width:420px;
+  width:400px;
 
-  padding:40px;
-
-  background:#fff;
-
-  border-radius:12px;
-
-  box-shadow:0 2px 12px rgba(0,0,0,.1);
+  padding:20px;
 }
 
 .title{
@@ -148,8 +161,6 @@ const handleLogin = async ()=>{
   text-align:center;
 
   margin-bottom:30px;
-
-  color:#409EFF;
 }
 
 </style>
