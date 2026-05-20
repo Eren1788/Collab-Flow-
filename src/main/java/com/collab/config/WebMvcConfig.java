@@ -1,6 +1,10 @@
 package com.collab.config;
 
 import com.collab.common.interceptor.JwtInterceptor;
+import com.collab.common.interceptor.PermissionInterceptor;
+import com.collab.mapper.PermissionMapper;
+import com.collab.mapper.RolePermissionMapper;
+import com.collab.mapper.UserRoleMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -16,17 +20,23 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class WebMvcConfig implements WebMvcConfigurer {
 
     /**
-     * RedisTemplate
+     * 注册RedisTemplate
      */
     private final RedisTemplate<String, Object> redisTemplate;
+
+    /**
+     * 注册权限拦截器
+     */
+    private final UserRoleMapper userRoleMapper;
+    private final RolePermissionMapper rolePermissionMapper;
+    private final PermissionMapper permissionMapper;
+
 
     /**
      * 注册JWT拦截器
      */
     @Override
-    public void addInterceptors(
-            InterceptorRegistry registry
-    ) {
+    public void addInterceptors(InterceptorRegistry registry) {
 
         registry.addInterceptor(new JwtInterceptor(redisTemplate))
                 .addPathPatterns("/**")
@@ -46,6 +56,13 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         // 静态资源
                         "/error"
                 );
+        registry.addInterceptor(
+                new PermissionInterceptor(
+                        userRoleMapper,
+                        rolePermissionMapper,
+                        permissionMapper
+                )
+        );
     }
 
     /**

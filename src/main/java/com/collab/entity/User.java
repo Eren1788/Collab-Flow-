@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 @Schema(description = "用户实体")
 public class User {
 
-    @Schema(description = "用户ID")
+    @TableId(type = IdType.AUTO)
     private Long id;
 
     @Schema(description = "用户名")

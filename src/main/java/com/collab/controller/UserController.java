@@ -1,5 +1,6 @@
 package com.collab.controller;
 
+import com.collab.common.annotation.RequirePermission;
 import com.collab.common.result.Result;
 import com.collab.dto.LoginDTO;
 import com.collab.dto.UserRegisterDTO;
@@ -59,6 +60,7 @@ public class UserController {
     /**
      * 用户列表
      */
+    @RequirePermission("user:list")
     @GetMapping("/list")
     @Operation(summary = "用户列表",description = "用户列表接口")
     public Result<Object> list(){

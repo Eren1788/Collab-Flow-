@@ -1,5 +1,6 @@
 package com.collab.controller;
 
+import com.collab.common.annotation.RequirePermission;
 import com.collab.common.result.Result;
 import com.collab.dto.TaskAssignDTO;
 import com.collab.dto.TaskDTO;
@@ -19,6 +20,7 @@ public class TaskController {
     /**
      * 新增任务
      */
+    @RequirePermission("task:add")
     @PostMapping("/add")
     public Result<Void> add(@RequestBody TaskDTO dto){
 
