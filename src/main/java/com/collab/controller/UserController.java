@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -38,7 +39,7 @@ public class UserController {
      */
     @PostMapping("/register")
     @Operation(summary = "用户注册",description = "用户注册接口")
-    public Result<Void> register(@RequestBody UserRegisterDTO dto){
+    public Result<Void> register( @Validated @RequestBody UserRegisterDTO dto){
         log.info("用户注册:{}",dto);
         userService.register(dto);
         return Result.success();
