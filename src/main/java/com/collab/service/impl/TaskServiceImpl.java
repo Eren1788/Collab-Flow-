@@ -1,5 +1,6 @@
 package com.collab.service.impl;
 
+import com.collab.service.NotificationService;
 import com.collab.websocket.NotificationMessage;
 import com.collab.websocket.NotificationWebSocketHandler;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -34,6 +35,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
     private final TaskMapper taskMapper;
     private final UserMapper userMapper;
     private final ProjectMapper projectMapper;
+    private final NotificationService notificationService;
 
     @Override
     public void addTask(TaskDTO dto) {
@@ -50,12 +52,31 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
          * 新任务通知执行人
          */
         if (task.getExecutorId() != null) {
-            NotificationMessage message = new NotificationMessage(
+
+            String content =
+                    "你有一个新的任务：" + task.getTitle();
+            /**
+             * 1、保存数据库通知
+             */
+            notificationService.saveNotification(
+                    task.getExecutorId(),
+                    LoginUserContext.getUserId(),
+                    "TASK_CREATE",
+                    content,
+                    task.getId()
+            );
+
+            /**
+             * 2、WebSocket实时推送
+             */
+            NotificationMessage message =
+                    new NotificationMessage(
                             "TASK_CREATE",
-                            "你有一个新的任务：" + task.getTitle(),
+                            content,
                             task.getId(),
                             System.currentTimeMillis()
                     );
+
             NotificationWebSocketHandler.sendMessage(
                     task.getExecutorId(),
                     message
@@ -167,12 +188,27 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
 
         taskMapper.updateById(task);
 
+        String content =
+                "任务状态已更新：" + task.getTitle();
+
         /**
-         * 通知任务创建人
+         * 1、保存通知
          */
-        NotificationMessage message = new NotificationMessage(
+        notificationService.saveNotification(
+                task.getCreatorId(),
+                LoginUserContext.getUserId(),
+                "TASK_STATUS",
+                content,
+                task.getId()
+        );
+
+        /**
+         * 2、WebSocket推送
+         */
+        NotificationMessage message =
+                new NotificationMessage(
                         "TASK_STATUS",
-                        "任务状态已更新：" + task.getTitle(),
+                        content,
                         task.getId(),
                         System.currentTimeMillis()
                 );
@@ -196,15 +232,30 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
 
         taskMapper.updateById(task);
 
+        String content = "你被指派了新任务：" + task.getTitle();
+
         /**
-         * 通知新执行人
+         * 1、保存通知
          */
-        NotificationMessage message = new NotificationMessage(
+        notificationService.saveNotification(
+                dto.getExecutorId(),
+                LoginUserContext.getUserId(),
+                "TASK_ASSIGN",
+                content,
+                task.getId()
+        );
+
+        /**
+         * 2、WebSocket推送
+         */
+        NotificationMessage message =
+                new NotificationMessage(
                         "TASK_ASSIGN",
-                        "你被指派了新任务：" + task.getTitle(),
+                        content,
                         task.getId(),
                         System.currentTimeMillis()
                 );
+
         NotificationWebSocketHandler.sendMessage(
                 dto.getExecutorId(),
                 message

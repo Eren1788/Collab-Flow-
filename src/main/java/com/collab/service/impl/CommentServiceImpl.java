@@ -17,6 +17,7 @@ import com.collab.vo.CommentVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
+import com.collab.service.NotificationService;
 
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -31,6 +32,8 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
     private final UserMapper userMapper;
 
     private final TaskMapper taskMapper;
+
+    private final NotificationService notificationService;
 
     @Override
     public void addComment(CommentDTO dto) {
@@ -55,17 +58,34 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
         Task task = taskMapper.selectById(comment.getTaskId());
 
         if (task != null) {
+            String content = "任务收到新评论：" + task.getTitle();
 
             /**
              * 通知任务创建人
              */
             if (!task.getCreatorId().equals(comment.getUserId())) {
+
+                /**
+                 * 1、保存通知
+                 */
+                notificationService.saveNotification(
+                        task.getCreatorId(),
+                        comment.getUserId(),
+                        "COMMENT",
+                        content,
+                        task.getId()
+                );
+
+                /**
+                 * 2、WebSocket推送
+                 */
                 NotificationMessage message = new NotificationMessage(
                                 "COMMENT",
-                                "任务收到新评论：" + task.getTitle(),
+                                content,
                                 task.getId(),
                                 System.currentTimeMillis()
                         );
+
                 NotificationWebSocketHandler.sendMessage(
                         task.getCreatorId(),
                         message
@@ -75,18 +95,43 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
             /**
              * 通知任务执行人
              */
-            if (task.getExecutorId() != null && !task.getExecutorId().equals(comment.getUserId())) {
-                NotificationMessage message = new NotificationMessage(
-                                "COMMENT",
-                                "任务收到新评论：" + task.getTitle(),
-                                task.getId(),
-                                System.currentTimeMillis()
-                        );
+            if (
+                    task.getExecutorId() != null
+                            &&
+                            !task.getExecutorId().equals(comment.getUserId())
+            ) {
 
-                NotificationWebSocketHandler.sendMessage(
-                        task.getExecutorId(),
-                        message
-                );
+                /**
+                 * 避免重复通知
+                 */
+                if (!task.getExecutorId().equals(task.getCreatorId())) {
+
+                    /**
+                     * 1、保存通知
+                     */
+                    notificationService.saveNotification(
+                            task.getExecutorId(),
+                            comment.getUserId(),
+                            "COMMENT",
+                            content,
+                            task.getId()
+                    );
+
+                    /**
+                     * 2、WebSocket推送
+                     */
+                    NotificationMessage message = new NotificationMessage(
+                                    "COMMENT",
+                                    content,
+                                    task.getId(),
+                                    System.currentTimeMillis()
+                            );
+
+                    NotificationWebSocketHandler.sendMessage(
+                            task.getExecutorId(),
+                            message
+                    );
+                }
             }
         }
     }
