@@ -1,5 +1,6 @@
 package com.collab.controller;
 
+import com.collab.common.annotation.OperationLogAnnotation;
 import com.collab.common.annotation.RequirePermission;
 import com.collab.common.result.Result;
 import com.collab.dto.TaskAssignDTO;
@@ -8,8 +9,10 @@ import com.collab.dto.TaskStatusDTO;
 import com.collab.service.TaskService;
 import com.collab.vo.TaskVO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
+@Slf4j
 @RestController
 @RequestMapping("/task")
 @RequiredArgsConstructor
@@ -88,11 +91,11 @@ public class TaskController {
     /**
      * 删除任务
      */
+    @OperationLogAnnotation("删除任务")//使用aop
     @DeleteMapping("/delete/{id}")
     public Result<Void> delete(@PathVariable Long id){
-
+        log.info("进入删除接口");
         taskService.deleteTask(id);
-
         return Result.success();
     }
 
@@ -100,9 +103,7 @@ public class TaskController {
      * 修改任务状态
      */
     @PutMapping("/status")
-    public Result<Void> status(
-            @RequestBody TaskStatusDTO dto
-    ){
+    public Result<Void> status(@RequestBody TaskStatusDTO dto){
 
         taskService.updateStatus(dto);
 
@@ -113,9 +114,7 @@ public class TaskController {
      * 指派任务
      */
     @PutMapping("/assign")
-    public Result<Void> assign(
-            @RequestBody TaskAssignDTO dto
-    ){
+    public Result<Void> assign(@RequestBody TaskAssignDTO dto){
 
         taskService.assignTask(dto);
 
@@ -128,9 +127,7 @@ public class TaskController {
     @GetMapping("/statistics")
     public Result<Object> statistics(){
 
-        return Result.success(
-                taskService.statistics()
-        );
+        return Result.success(taskService.statistics());
     }
 
 }

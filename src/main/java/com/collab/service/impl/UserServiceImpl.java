@@ -10,7 +10,9 @@ import com.collab.dto.LoginDTO;
 import com.collab.dto.UserRegisterDTO;
 import com.collab.dto.UserUpdateDTO;
 import com.collab.entity.User;
+import com.collab.entity.UserRole;
 import com.collab.mapper.UserMapper;
+import com.collab.mapper.UserRoleMapper;
 import com.collab.service.UserService;
 import com.collab.common.utils.JwtUtils;
 import com.collab.vo.UserVO;
@@ -20,6 +22,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.HashMap;
@@ -35,6 +38,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     private final UserMapper userMapper;
     private final RedisTemplate<String,Object> redisTemplate;
+    private final UserRoleMapper userRoleMapper;
 
     @Override
     public Map<String, Object> login(LoginDTO loginDTO) {
@@ -76,11 +80,16 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     }
 
     @Override
+    @Transactional
     public void register(UserRegisterDTO dto) {
 
+        // 判断用户名是否存在
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
 
-        wrapper.eq(User::getUsername,dto.getUsername());
+        wrapper.eq(
+                User::getUsername,
+                dto.getUsername()
+        );
 
         Long count = userMapper.selectCount(wrapper);
 
@@ -88,15 +97,25 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             throw new BusinessException("用户名已存在");
         }
 
+        // 保存用户
         User user = new User();
 
         BeanUtils.copyProperties(dto,user);
 
-        user.setRole("user");
-
+        // 用户状态：1正常
         user.setStatus(1);
 
         userMapper.insert(user);
+
+        // 自动绑定默认角色：USER
+        UserRole userRole = new UserRole();
+
+        userRole.setUserId(user.getId());
+
+        // 3 = 普通成员(USER)
+        userRole.setRoleId(3L);
+
+        userRoleMapper.insert(userRole);
     }
 
     @Override

@@ -1,5 +1,6 @@
 package com.collab.controller;
 
+import com.collab.common.annotation.OperationLogAnnotation;
 import com.collab.common.result.Result;
 import com.collab.dto.ProjectDTO;
 import com.collab.dto.ProjectMemberDTO;
@@ -18,6 +19,7 @@ public class ProjectController {
     /**
      * 新增项目
      */
+    @OperationLogAnnotation("新增项目")//使用aop
     @PostMapping("/add")
     public Result<Void> add(@RequestBody ProjectDTO dto){
 
