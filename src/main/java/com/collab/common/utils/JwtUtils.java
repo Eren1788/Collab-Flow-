@@ -43,7 +43,7 @@ public class JwtUtils {
      */
     public static Long getUserId(String token){
         Claims claims = parseToken(token);
-        return ((Long) claims.get("userId")).longValue();
+        return ((Number) claims.get("userId")).longValue();
     }
     /**
      * 获取用户名

@@ -6,7 +6,7 @@ import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
- * 组测拦截器
+ * 注册测拦截器
  */
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
@@ -14,14 +14,17 @@ public class WebConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(new JwtInterceptor())
                 .addPathPatterns("/**")
+                //放行接口
                 .excludePathPatterns(
                         "/user/login",
                         "/user/register",
                         "/doc.html",
-                        "/v3/api-docs/**",
-                        "/webjars/**",
-                        "/swagger-resources/**",
-                        "/swagger-ui/**"
+//                        "/v3/api-docs/**",
+//                        "/webjars/**",
+//                        "/swagger-resources/**",
+//                        "/swagger-ui/**"
+                        "/swagger-ui/**",
+                        "/v3/api-docs/**"
                 );
     }
 }

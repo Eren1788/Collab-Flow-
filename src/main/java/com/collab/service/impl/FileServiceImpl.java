@@ -2,6 +2,8 @@ package com.collab.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.collab.common.exception.BusinessException;
+import com.collab.common.utils.LoginUserContext;
 import com.collab.entity.FileInfo;
 import com.collab.mapper.FileInfoMapper;
 import com.collab.service.FileService;
@@ -24,9 +26,7 @@ import java.util.*;
 
 @Service
 @RequiredArgsConstructor
-public class FileServiceImpl
-        extends ServiceImpl<FileInfoMapper, FileInfo>
-        implements FileService {
+public class FileServiceImpl extends ServiceImpl<FileInfoMapper, FileInfo> implements FileService {
 
     private final FileInfoMapper fileInfoMapper;
 
@@ -40,38 +40,34 @@ public class FileServiceImpl
             Long projectId
     ) {
 
-        if(file == null || file.isEmpty()){
+        if (file == null || file.isEmpty()) {
 
-            throw new RuntimeException("文件不能为空");
+            throw new BusinessException("文件不能为空");
         }
 
         try {
 
             // 原文件名
-            String originalFilename =
-                    file.getOriginalFilename();
+            String originalFilename = file.getOriginalFilename();
 
             // 后缀名
-            String suffix =
-                    originalFilename.substring(
+            String suffix = originalFilename.substring(
                             originalFilename.lastIndexOf(".")
                     );
 
             // UUID文件名
-            String newFileName =
-                    UUID.randomUUID() + suffix;
+            String newFileName = UUID.randomUUID() + suffix;
 
             // 上传目录
             File dir = new File(uploadPath);
 
-            if(!dir.exists()){
+            if (!dir.exists()) {
 
                 dir.mkdirs();
             }
 
             // 最终文件
-            File dest =
-                    new File(uploadPath
+            File dest = new File(uploadPath
                             + File.separator
                             + newFileName);
 
@@ -93,24 +89,24 @@ public class FileServiceImpl
 
             fileInfo.setFileType(file.getContentType());
 
-            fileInfo.setUploaderId(1L);
+            //fileInfo.setUploaderId(1L);
+            fileInfo.setUploaderId(LoginUserContext.getUserId());
 
             fileInfoMapper.insert(fileInfo);
 
-            Map<String,Object> map =
-                    new HashMap<>();
+            Map<String, Object> map = new HashMap<>();
 
-            map.put("id",fileInfo.getId());
+            map.put("id", fileInfo.getId());
 
-            map.put("fileName",originalFilename);
+            map.put("fileName", originalFilename);
 
-            map.put("url",newFileName);
+            map.put("url", newFileName);
 
             return map;
 
-        } catch (Exception e){
+        } catch (Exception e) {
 
-            throw new RuntimeException("文件上传失败");
+            throw new BusinessException("文件上传失败");
         }
     }
 
@@ -120,8 +116,7 @@ public class FileServiceImpl
             Long projectId
     ) {
 
-        LambdaQueryWrapper<FileInfo> wrapper =
-                new LambdaQueryWrapper<>();
+        LambdaQueryWrapper<FileInfo> wrapper = new LambdaQueryWrapper<>();
 
         wrapper.eq(
                 taskId != null,
@@ -137,28 +132,24 @@ public class FileServiceImpl
 
         wrapper.orderByDesc(FileInfo::getId);
 
-        List<FileInfo> files =
-                fileInfoMapper.selectList(wrapper);
+        List<FileInfo> files = fileInfoMapper.selectList(wrapper);
 
-        List<Object> list =
-                new ArrayList<>();
+        List<Object> list = new ArrayList<>();
 
         for (FileInfo file : files) {
+            Map<String, Object> map = new HashMap<>();
 
-            Map<String,Object> map =
-                    new HashMap<>();
+            map.put("id", file.getId());
 
-            map.put("id",file.getId());
+            map.put("name", file.getName());
 
-            map.put("name",file.getName());
+            map.put("url", file.getUrl());
 
-            map.put("url",file.getUrl());
+            map.put("fileSize", file.getFileSize());
 
-            map.put("fileSize",file.getFileSize());
+            map.put("fileType", file.getFileType());
 
-            map.put("fileType",file.getFileType());
-
-            map.put("uploadTime",file.getUploadTime());
+            map.put("uploadTime", file.getUploadTime());
 
             list.add(map);
         }
@@ -169,22 +160,18 @@ public class FileServiceImpl
     @Override
     public void deleteFile(Long id) {
 
-        FileInfo fileInfo =
-                fileInfoMapper.selectById(id);
+        FileInfo fileInfo = fileInfoMapper.selectById(id);
 
-        if(fileInfo == null){
-
-            throw new RuntimeException("文件不存在");
+        if (fileInfo == null) {
+            throw new BusinessException("文件不存在");
         }
 
         // 删除物理文件
-        File file =
-                new File(uploadPath
-                        + File.separator
-                        + fileInfo.getUrl());
+        File file = new File(uploadPath
+                + File.separator
+                + fileInfo.getUrl());
 
-        if(file.exists()){
-
+        if (file.exists()) {
             file.delete();
         }
 
@@ -197,48 +184,41 @@ public class FileServiceImpl
 
         try {
 
-            FileInfo fileInfo =
-                    fileInfoMapper.selectById(id);
+            FileInfo fileInfo = fileInfoMapper.selectById(id);
 
-            if(fileInfo == null){
-
-                throw new RuntimeException("文件不存在");
+            if (fileInfo == null) {
+                throw new BusinessException("文件不存在");
             }
 
-            File file =
-                    new File(uploadPath
-                            + File.separator
-                            + fileInfo.getUrl());
+            File file = new File(uploadPath
+                    + File.separator
+                    + fileInfo.getUrl());
 
-            Resource resource =
-                    new FileSystemResource(file);
+            Resource resource = new FileSystemResource(file);
 
-            String fileName =
-                    URLEncoder.encode(
-                            fileInfo.getName(),
-                            StandardCharsets.UTF_8
-                    );
+            String fileName = URLEncoder.encode(
+                    fileInfo.getName(),
+                    StandardCharsets.UTF_8
+            );
 
             return ResponseEntity.ok()
-                    .contentType(
-                            MediaType.APPLICATION_OCTET_STREAM
-                    )
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
                     .header(
                             HttpHeaders.CONTENT_DISPOSITION,
                             ContentDisposition
                                     .attachment()
                                     .filename(
                                             fileName,
-                                            StandardCharsets.UTF_8
+                                             StandardCharsets.UTF_8
                                     )
                                     .build()
                                     .toString()
                     )
                     .body(resource);
 
-        } catch (Exception e){
+        } catch (Exception e) {
 
-            throw new RuntimeException("文件下载失败");
+            throw new BusinessException("文件下载失败");
         }
     }
 }

@@ -3,6 +3,8 @@ package com.collab.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.collab.common.exception.BusinessException;
+import com.collab.common.utils.LoginUserContext;
 import com.collab.dto.TaskAssignDTO;
 import com.collab.dto.TaskDTO;
 import com.collab.dto.TaskStatusDTO;
@@ -18,7 +20,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
-
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,14 +27,10 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-public class TaskServiceImpl
-        extends ServiceImpl<TaskMapper, Task>
-        implements TaskService {
+public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements TaskService {
 
     private final TaskMapper taskMapper;
-
     private final UserMapper userMapper;
-
     private final ProjectMapper projectMapper;
 
     @Override
@@ -43,7 +40,8 @@ public class TaskServiceImpl
 
         BeanUtils.copyProperties(dto,task);
 
-        task.setCreatorId(1L);
+        //task.setCreatorId(1L);
+        task.setCreatorId(LoginUserContext.getUserId());
 
         taskMapper.insert(task);
     }
@@ -51,8 +49,7 @@ public class TaskServiceImpl
     @Override
     public List<TaskVO> listTask() {
 
-        List<Task> tasks =
-                taskMapper.selectList(null);
+        List<Task> tasks = taskMapper.selectList(null);
 
         return tasks.stream()
                 .map(this::buildTaskVO)
@@ -70,11 +67,9 @@ public class TaskServiceImpl
             String keyword
     ) {
 
-        Page<Task> page =
-                new Page<>(pageNum,pageSize);
+        Page<Task> page = new Page<>(pageNum,pageSize);
 
-        LambdaQueryWrapper<Task> wrapper =
-                new LambdaQueryWrapper<>();
+        LambdaQueryWrapper<Task> wrapper = new LambdaQueryWrapper<>();
 
         wrapper.eq(
                 projectId != null,
@@ -108,16 +103,13 @@ public class TaskServiceImpl
 
         wrapper.orderByDesc(Task::getId);
 
-        Page<Task> taskPage =
-                taskMapper.selectPage(page,wrapper);
+        Page<Task> taskPage = taskMapper.selectPage(page,wrapper);
 
-        Page<TaskVO> result =
-                new Page<>();
+        Page<TaskVO> result = new Page<>();
 
         BeanUtils.copyProperties(taskPage,result);
 
-        List<TaskVO> records =
-                taskPage.getRecords()
+        List<TaskVO> records = taskPage.getRecords()
                         .stream()
                         .map(this::buildTaskVO)
                         .collect(Collectors.toList());
@@ -129,38 +121,29 @@ public class TaskServiceImpl
 
     @Override
     public TaskVO detail(Long id) {
-
-        Task task =
-                taskMapper.selectById(id);
-
+        Task task = taskMapper.selectById(id);
         return buildTaskVO(task);
     }
 
     @Override
     public void updateTask(TaskDTO dto) {
-
         Task task = new Task();
-
         BeanUtils.copyProperties(dto,task);
-
         taskMapper.updateById(task);
     }
 
     @Override
     public void deleteTask(Long id) {
-
         taskMapper.deleteById(id);
     }
 
     @Override
     public void updateStatus(TaskStatusDTO dto) {
 
-        Task task =
-                taskMapper.selectById(dto.getId());
+        Task task = taskMapper.selectById(dto.getId());
 
         if(task == null){
-
-            throw new RuntimeException("任务不存在");
+            throw new BusinessException("任务不存在");
         }
 
         task.setStatus(dto.getStatus());
@@ -171,14 +154,11 @@ public class TaskServiceImpl
     @Override
     public void assignTask(TaskAssignDTO dto) {
 
-        Task task =
-                taskMapper.selectById(dto.getTaskId());
+        Task task = taskMapper.selectById(dto.getTaskId());
 
         if(task == null){
-
-            throw new RuntimeException("任务不存在");
+            throw new BusinessException("任务不存在");
         }
-
         task.setExecutorId(dto.getExecutorId());
 
         taskMapper.updateById(task);
@@ -187,35 +167,27 @@ public class TaskServiceImpl
     @Override
     public Map<String, Object> statistics() {
 
-        Map<String,Object> map =
-                new HashMap<>();
+        Map<String,Object> map = new HashMap<>();
 
-        Long total =
-                taskMapper.selectCount(null);
+        Long total = taskMapper.selectCount(null);
 
-        LambdaQueryWrapper<Task> todoWrapper =
-                new LambdaQueryWrapper<>();
+        LambdaQueryWrapper<Task> todoWrapper = new LambdaQueryWrapper<>();
 
         todoWrapper.eq(Task::getStatus,0);
 
-        Long todo =
-                taskMapper.selectCount(todoWrapper);
+        Long todo = taskMapper.selectCount(todoWrapper);
 
-        LambdaQueryWrapper<Task> doingWrapper =
-                new LambdaQueryWrapper<>();
+        LambdaQueryWrapper<Task> doingWrapper = new LambdaQueryWrapper<>();
 
         doingWrapper.eq(Task::getStatus,1);
 
-        Long doing =
-                taskMapper.selectCount(doingWrapper);
+        Long doing = taskMapper.selectCount(doingWrapper);
 
-        LambdaQueryWrapper<Task> doneWrapper =
-                new LambdaQueryWrapper<>();
+        LambdaQueryWrapper<Task> doneWrapper = new LambdaQueryWrapper<>();
 
         doneWrapper.eq(Task::getStatus,2);
 
-        Long done =
-                taskMapper.selectCount(doneWrapper);
+        Long done = taskMapper.selectCount(doneWrapper);
 
         map.put("total",total);
 
@@ -237,40 +209,24 @@ public class TaskServiceImpl
 
         BeanUtils.copyProperties(task,vo);
 
-        Project project =
-                projectMapper.selectById(
-                        task.getProjectId()
-                );
+        Project project = projectMapper.selectById(task.getProjectId());
 
         if(project != null){
-
-            vo.setProjectName(
-                    project.getName()
-            );
+            vo.setProjectName(project.getName());
         }
 
-        User creator =
-                userMapper.selectById(
-                        task.getCreatorId()
-                );
+        User creator = userMapper.selectById(task.getCreatorId());
 
         if(creator != null){
 
-            vo.setCreatorName(
-                    creator.getNickname()
-            );
+            vo.setCreatorName(creator.getNickname());
         }
 
-        User executor =
-                userMapper.selectById(
-                        task.getExecutorId()
-                );
+        User executor = userMapper.selectById(task.getExecutorId());
 
         if(executor != null){
 
-            vo.setExecutorName(
-                    executor.getNickname()
-            );
+            vo.setExecutorName(executor.getNickname());
         }
 
         return vo;

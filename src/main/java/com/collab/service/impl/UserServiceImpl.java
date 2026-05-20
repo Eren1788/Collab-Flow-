@@ -3,6 +3,8 @@ package com.collab.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.collab.common.exception.BusinessException;
+import com.collab.common.utils.LoginUserContext;
 import com.collab.dto.LoginDTO;
 import com.collab.dto.UserRegisterDTO;
 import com.collab.dto.UserUpdateDTO;
@@ -26,7 +28,6 @@ import java.util.stream.Collectors;
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
 
     private final UserMapper userMapper;
-
     @Override
     public Map<String, Object> login(LoginDTO loginDTO) {
 
@@ -37,13 +38,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         User user = userMapper.selectOne(wrapper);
 
         if(user == null){
-            throw new RuntimeException("用户不存在");
+            throw new BusinessException("用户不存在");
         }
 
         if(!user.getPassword().equals(loginDTO.getPassword())){
-            throw new RuntimeException("密码错误");
+            throw new BusinessException("密码错误");
         }
 
+        //创建token
         String token = JwtUtils.creatToken(user.getId(),user.getUsername());
 
         Map<String,Object> map = new HashMap<>();
@@ -63,7 +65,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         Long count = userMapper.selectCount(wrapper);
 
         if(count > 0){
-            throw new RuntimeException("用户名已存在");
+            throw new BusinessException("用户名已存在");
         }
 
         User user = new User();
@@ -80,7 +82,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     @Override
     public UserVO getCurrentUserInfo() {
 
-        Long userId = 1L;
+        //Long userId = 1L;
+        Long userId = LoginUserContext.getUserId();
 
         User user = userMapper.selectById(userId);
 
@@ -114,8 +117,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
         Page<User> page = new Page<>(pageNum,pageSize);
 
-        LambdaQueryWrapper<User> wrapper =
-                new LambdaQueryWrapper<>();
+        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
 
         wrapper.like(
                 StringUtils.hasText(keyword),
@@ -123,8 +125,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
                 keyword
         );
 
-        Page<User> userPage =
-                userMapper.selectPage(page,wrapper);
+        Page<User> userPage = userMapper.selectPage(page,wrapper);
 
         Page<UserVO> result = new Page<>();
 
@@ -172,7 +173,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     @Override
     public void deleteUser(Long id) {
-
         userMapper.deleteById(id);
     }
 }

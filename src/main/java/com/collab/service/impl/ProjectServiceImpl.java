@@ -3,6 +3,8 @@ package com.collab.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.collab.common.exception.BusinessException;
+import com.collab.common.utils.LoginUserContext;
 import com.collab.dto.ProjectDTO;
 import com.collab.dto.ProjectMemberDTO;
 import com.collab.entity.Project;
@@ -25,8 +27,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project>
-        implements ProjectService {
+public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> implements ProjectService {
 
     private final ProjectMapper projectMapper;
 
@@ -41,9 +42,10 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project>
 
         Project project = new Project();
 
-        BeanUtils.copyProperties(dto,project);
+        BeanUtils.copyProperties(dto, project);
 
-        project.setCreatorId(1L);
+        //project.setCreatorId(1L);
+        project.setCreatorId(LoginUserContext.getUserId());
 
         projectMapper.insert(project);
 
@@ -53,8 +55,10 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project>
 
         member.setProjectId(project.getId());
 
-        member.setUserId(1L);
+        //member.setUserId(1L);
+        member.setUserId(LoginUserContext.getUserId());
 
+        //TODO这里要完善一下
         member.setRole("admin");
 
         projectMemberMapper.insert(member);
@@ -63,8 +67,7 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project>
     @Override
     public List<ProjectVO> listProject() {
 
-        List<Project> projects =
-                projectMapper.selectList(null);
+        List<Project> projects = projectMapper.selectList(null);
 
         return projects.stream().map(this::buildProjectVO)
                 .collect(Collectors.toList());
@@ -76,12 +79,9 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project>
                                        String keyword,
                                        Integer status) {
 
-        Page<Project> page =
-                new Page<>(pageNum,pageSize);
+        Page<Project> page = new Page<>(pageNum, pageSize);
 
-        LambdaQueryWrapper<Project> wrapper =
-                new LambdaQueryWrapper<>();
-
+        LambdaQueryWrapper<Project> wrapper = new LambdaQueryWrapper<>();
         wrapper.like(
                 StringUtils.hasText(keyword),
                 Project::getName,
@@ -96,15 +96,13 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project>
 
         wrapper.orderByDesc(Project::getId);
 
-        Page<Project> projectPage =
-                projectMapper.selectPage(page,wrapper);
+        Page<Project> projectPage = projectMapper.selectPage(page, wrapper);
 
         Page<ProjectVO> result = new Page<>();
 
-        BeanUtils.copyProperties(projectPage,result);
+        BeanUtils.copyProperties(projectPage, result);
 
-        List<ProjectVO> records =
-                projectPage.getRecords()
+        List<ProjectVO> records = projectPage.getRecords()
                         .stream()
                         .map(this::buildProjectVO)
                         .collect(Collectors.toList());
@@ -117,8 +115,7 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project>
     @Override
     public ProjectVO detail(Long id) {
 
-        Project project =
-                projectMapper.selectById(id);
+        Project project = projectMapper.selectById(id);
 
         return buildProjectVO(project);
     }
@@ -128,7 +125,7 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project>
 
         Project project = new Project();
 
-        BeanUtils.copyProperties(dto,project);
+        BeanUtils.copyProperties(dto, project);
 
         projectMapper.updateById(project);
     }
@@ -142,8 +139,7 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project>
 
         // 删除项目成员
 
-        LambdaQueryWrapper<ProjectMember> memberWrapper =
-                new LambdaQueryWrapper<>();
+        LambdaQueryWrapper<ProjectMember> memberWrapper = new LambdaQueryWrapper<>();
 
         memberWrapper.eq(
                 ProjectMember::getProjectId,
@@ -154,10 +150,9 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project>
 
         // 删除项目任务
 
-        LambdaQueryWrapper<Task> taskWrapper =
-                new LambdaQueryWrapper<>();
+        LambdaQueryWrapper<Task> taskWrapper = new LambdaQueryWrapper<>();
 
-        taskWrapper.eq(Task::getProjectId,id);
+        taskWrapper.eq(Task::getProjectId, id);
 
         taskMapper.delete(taskWrapper);
     }
@@ -165,27 +160,23 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project>
     @Override
     public void addMember(ProjectMemberDTO dto) {
 
-        LambdaQueryWrapper<ProjectMember> wrapper =
-                new LambdaQueryWrapper<>();
+        LambdaQueryWrapper<ProjectMember> wrapper = new LambdaQueryWrapper<>();
 
-        wrapper.eq(ProjectMember::getProjectId,
-                dto.getProjectId());
+        wrapper.eq(ProjectMember::getProjectId, dto.getProjectId());
 
-        wrapper.eq(ProjectMember::getUserId,
-                dto.getUserId());
+        wrapper.eq(ProjectMember::getUserId, dto.getUserId());
 
-        Long count =
-                projectMemberMapper.selectCount(wrapper);
+        Long count = projectMemberMapper.selectCount(wrapper);
 
-        if(count > 0){
-
-            throw new RuntimeException("用户已存在项目中");
+        if (count > 0) {
+            throw new BusinessException("用户已存在项目中");
         }
 
         ProjectMember member = new ProjectMember();
 
-        BeanUtils.copyProperties(dto,member);
+        BeanUtils.copyProperties(dto, member);
 
+        //TODO后续完善
         member.setRole("member");
 
         projectMemberMapper.insert(member);
@@ -194,36 +185,29 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project>
     @Override
     public List<Object> memberList(Long projectId) {
 
-        LambdaQueryWrapper<ProjectMember> wrapper =
-                new LambdaQueryWrapper<>();
+        LambdaQueryWrapper<ProjectMember> wrapper = new LambdaQueryWrapper<>();
 
-        wrapper.eq(ProjectMember::getProjectId,
-                projectId);
+        wrapper.eq(ProjectMember::getProjectId, projectId);
 
-        List<ProjectMember> members =
-                projectMemberMapper.selectList(wrapper);
+        List<ProjectMember> members = projectMemberMapper.selectList(wrapper);
 
         List<Object> list = new ArrayList<>();
 
         for (ProjectMember member : members) {
 
-            User user =
-                    userMapper.selectById(
-                            member.getUserId()
-                    );
+            User user = userMapper.selectById(member.getUserId());
 
-            Map<String,Object> map =
-                    new HashMap<>();
+            Map<String, Object> map = new HashMap<>();
 
-            map.put("id",member.getId());
+            map.put("id", member.getId());
 
-            map.put("userId",user.getId());
+            map.put("userId", user.getId());
 
-            map.put("nickname",user.getNickname());
+            map.put("nickname", user.getNickname());
 
-            map.put("avatar",user.getAvatar());
+            map.put("avatar", user.getAvatar());
 
-            map.put("role",member.getRole());
+            map.put("role", member.getRole());
 
             list.add(map);
         }
@@ -234,32 +218,23 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project>
     /**
      * 封装 ProjectVO
      */
-    private ProjectVO buildProjectVO(Project project){
+    private ProjectVO buildProjectVO(Project project) {
 
         ProjectVO vo = new ProjectVO();
 
-        BeanUtils.copyProperties(project,vo);
+        BeanUtils.copyProperties(project, vo);
 
-        User creator =
-                userMapper.selectById(
-                        project.getCreatorId()
-                );
+        User creator = userMapper.selectById(project.getCreatorId());
 
-        if(creator != null){
-
-            vo.setCreatorName(
-                    creator.getNickname()
-            );
+        if (creator != null) {
+            vo.setCreatorName(creator.getNickname());
         }
 
-        LambdaQueryWrapper<Task> wrapper =
-                new LambdaQueryWrapper<>();
+        LambdaQueryWrapper<Task> wrapper = new LambdaQueryWrapper<>();
 
-        wrapper.eq(Task::getProjectId,
-                project.getId());
+        wrapper.eq(Task::getProjectId, project.getId());
 
-        Long taskCount =
-                taskMapper.selectCount(wrapper);
+        Long taskCount = taskMapper.selectCount(wrapper);
 
         vo.setTaskCount(taskCount.intValue());
 

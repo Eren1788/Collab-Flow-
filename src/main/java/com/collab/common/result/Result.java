@@ -1,35 +1,84 @@
 package com.collab.common.result;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
-/**
- * 返回数据给前端
- *
- * @param <T>
- */
 @Data
-@AllArgsConstructor
-@NoArgsConstructor
 public class Result<T> {
 
+    /**
+     * 状态码
+     */
     private Integer code;
+
+    /**
+     * 提示信息
+     */
     private String message;
+
+    /**
+     * 返回数据
+     */
     private T data;
 
-    //成功并返回数据
-    public static <T> Result<T> success(T data) {
-        return new Result<>(200, "success", data);
+    /**
+     * 成功
+     */
+    public static <T> Result<T> success(){
+
+        Result<T> result = new Result<>();
+
+        result.setCode(200);
+
+        result.setMessage("success");
+
+        return result;
     }
 
-    //成功但不返回数据
-    public static <T> Result<T> success() {
-        return new Result<>(200, "success", null);
+    /**
+     * 成功带数据
+     */
+    public static <T> Result<T> success(T data){
+
+        Result<T> result = new Result<>();
+
+        result.setCode(200);
+
+        result.setMessage("success");
+
+        result.setData(data);
+
+        return result;
     }
 
-    //失败
-    public static <T> Result<T> error(String message) {
-        return new Result<>(500, message, null);
+    /**
+     * 失败
+     */
+    public static <T> Result<T> error(String message){
+
+        Result<T> result = new Result<>();
+
+        result.setCode(500);
+
+        result.setMessage(message);
+
+        return result;
     }
+
+    /**
+     * 自定义状态码
+     */
+    public static <T> Result<T> error(
+            Integer code,
+            String message
+    ){
+
+        Result<T> result = new Result<>();
+
+        result.setCode(code);
+
+        result.setMessage(message);
+
+        return result;
+    }
+
 }
