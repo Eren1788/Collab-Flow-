@@ -81,6 +81,7 @@ public class ProjectController {
     /**
      * 删除项目
      */
+    //TODO aop功能待完善
     @DeleteMapping("/delete/{id}")
     public Result<Void> delete(@PathVariable Long id){
 

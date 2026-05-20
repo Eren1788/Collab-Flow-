@@ -1,5 +1,7 @@
 package com.collab.service.impl;
 
+import com.collab.websocket.NotificationMessage;
+import com.collab.websocket.NotificationWebSocketHandler;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -38,12 +40,27 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
 
         Task task = new Task();
 
-        BeanUtils.copyProperties(dto,task);
+        BeanUtils.copyProperties(dto, task);
 
-        //task.setCreatorId(1L);
         task.setCreatorId(LoginUserContext.getUserId());
 
         taskMapper.insert(task);
+
+        /**
+         * 新任务通知执行人
+         */
+        if (task.getExecutorId() != null) {
+            NotificationMessage message = new NotificationMessage(
+                            "TASK_CREATE",
+                            "你有一个新的任务：" + task.getTitle(),
+                            task.getId(),
+                            System.currentTimeMillis()
+                    );
+            NotificationWebSocketHandler.sendMessage(
+                    task.getExecutorId(),
+                    message
+            );
+        }
     }
 
     @Override
@@ -149,6 +166,21 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
         task.setStatus(dto.getStatus());
 
         taskMapper.updateById(task);
+
+        /**
+         * 通知任务创建人
+         */
+        NotificationMessage message = new NotificationMessage(
+                        "TASK_STATUS",
+                        "任务状态已更新：" + task.getTitle(),
+                        task.getId(),
+                        System.currentTimeMillis()
+                );
+
+        NotificationWebSocketHandler.sendMessage(
+                task.getCreatorId(),
+                message
+        );
     }
 
     @Override
@@ -159,9 +191,24 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
         if(task == null){
             throw new BusinessException("任务不存在");
         }
+
         task.setExecutorId(dto.getExecutorId());
 
         taskMapper.updateById(task);
+
+        /**
+         * 通知新执行人
+         */
+        NotificationMessage message = new NotificationMessage(
+                        "TASK_ASSIGN",
+                        "你被指派了新任务：" + task.getTitle(),
+                        task.getId(),
+                        System.currentTimeMillis()
+                );
+        NotificationWebSocketHandler.sendMessage(
+                dto.getExecutorId(),
+                message
+        );
     }
 
     @Override

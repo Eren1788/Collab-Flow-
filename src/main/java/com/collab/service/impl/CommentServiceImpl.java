@@ -1,5 +1,9 @@
 package com.collab.service.impl;
 
+import com.collab.entity.Task;
+import com.collab.mapper.TaskMapper;
+import com.collab.websocket.NotificationMessage;
+import com.collab.websocket.NotificationWebSocketHandler;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.collab.common.utils.LoginUserContext;
@@ -26,6 +30,8 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
 
     private final UserMapper userMapper;
 
+    private final TaskMapper taskMapper;
+
     @Override
     public void addComment(CommentDTO dto) {
 
@@ -33,8 +39,6 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
 
         BeanUtils.copyProperties(dto, comment);
 
-        // 当前登录用户ID
-        //comment.setUserId(1L);
         comment.setUserId(LoginUserContext.getUserId());
 
         // 一级评论
@@ -44,6 +48,47 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
         }
 
         commentMapper.insert(comment);
+
+        /**
+         * 查询任务
+         */
+        Task task = taskMapper.selectById(comment.getTaskId());
+
+        if (task != null) {
+
+            /**
+             * 通知任务创建人
+             */
+            if (!task.getCreatorId().equals(comment.getUserId())) {
+                NotificationMessage message = new NotificationMessage(
+                                "COMMENT",
+                                "任务收到新评论：" + task.getTitle(),
+                                task.getId(),
+                                System.currentTimeMillis()
+                        );
+                NotificationWebSocketHandler.sendMessage(
+                        task.getCreatorId(),
+                        message
+                );
+            }
+
+            /**
+             * 通知任务执行人
+             */
+            if (task.getExecutorId() != null && !task.getExecutorId().equals(comment.getUserId())) {
+                NotificationMessage message = new NotificationMessage(
+                                "COMMENT",
+                                "任务收到新评论：" + task.getTitle(),
+                                task.getId(),
+                                System.currentTimeMillis()
+                        );
+
+                NotificationWebSocketHandler.sendMessage(
+                        task.getExecutorId(),
+                        message
+                );
+            }
+        }
     }
 
     @Override
