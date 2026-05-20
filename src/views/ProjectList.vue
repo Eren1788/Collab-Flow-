@@ -1,94 +1,637 @@
 <template>
-  <div>
-    <el-button type="primary" @click="openDialog()">新增项目</el-button>
-    <el-table :data="list" v-loading="loading">
-      <el-table-column prop="id" label="ID"/>
-      <el-table-column prop="name" label="项目名称"/>
-      <el-table-column prop="description" label="项目描述"/>
-      <el-table-column prop="status" label="状态">
-        <template #default="{ row }">{{ statusText(row.status) }}</template>
-      </el-table-column>
-      <el-table-column label="操作">
-        <template #default="{ row }">
-          <el-button size="mini" @click="openDialog(row)">编辑</el-button>
-          <el-button size="mini" type="danger" @click="deleteProject(row.id)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
 
-    <el-dialog :title="dialogTitle" :visible.sync="dialogVisible">
-      <el-form :model="form">
-        <el-form-item label="项目名称"><el-input v-model="form.name"/></el-form-item>
-        <el-form-item label="项目描述"><el-input v-model="form.description"/></el-form-item>
-        <el-form-item label="状态">
-          <el-select v-model="form.status" placeholder="请选择">
-            <el-option label="未开始" :value="0"/>
-            <el-option label="进行中" :value="1"/>
-            <el-option label="已完成" :value="2"/>
+  <div class="project-container">
+
+    <!-- 顶部工具栏 -->
+
+    <el-card shadow="never">
+
+      <div class="toolbar">
+
+        <div class="left">
+
+          <el-input
+            v-model="keyword"
+            placeholder="请输入项目名称"
+            clearable
+            style="width:220px"
+          />
+
+          <el-select
+            v-model="status"
+            placeholder="项目状态"
+            clearable
+            style="width:150px"
+          >
+
+            <el-option
+              label="进行中"
+              :value="1"
+            />
+
+            <el-option
+              label="已完成"
+              :value="2"
+            />
+
+            <el-option
+              label="已暂停"
+              :value="3"
+            />
+
           </el-select>
+
+          <el-button
+            type="primary"
+            @click="loadProjectList"
+          >
+            搜索
+          </el-button>
+
+        </div>
+
+        <div class="right">
+
+          <el-button
+            type="primary"
+            @click="openAddDialog"
+          >
+            新增项目
+          </el-button>
+
+        </div>
+
+      </div>
+
+    </el-card>
+
+    <!-- 项目表格 -->
+
+    <el-card shadow="never">
+
+      <el-table
+        :data="tableData"
+        border
+        stripe
+        style="width:100%"
+      >
+
+        <el-table-column
+          prop="id"
+          label="ID"
+          width="80"
+        />
+
+        <el-table-column
+          prop="name"
+          label="项目名称"
+        />
+
+        <el-table-column
+          prop="description"
+          label="项目描述"
+          show-overflow-tooltip
+        />
+
+        <el-table-column
+          prop="status"
+          label="项目状态"
+          width="120"
+        >
+
+          <template #default="scope">
+
+            <el-tag
+              v-if="scope.row.status === 1"
+              type="primary"
+            >
+              进行中
+            </el-tag>
+
+            <el-tag
+              v-else-if="scope.row.status === 2"
+              type="success"
+            >
+              已完成
+            </el-tag>
+
+            <el-tag
+              v-else
+              type="warning"
+            >
+              已暂停
+            </el-tag>
+
+          </template>
+
+        </el-table-column>
+
+        <el-table-column
+          prop="createTime"
+          label="创建时间"
+          width="180"
+        />
+
+        <el-table-column
+          label="操作"
+          width="320"
+          fixed="right"
+        >
+
+          <template #default="scope">
+
+            <el-button
+              type="primary"
+              size="small"
+              @click="handleEdit(scope.row)"
+            >
+              编辑
+            </el-button>
+
+            <el-button
+              type="success"
+              size="small"
+              @click="handleMember(scope.row)"
+            >
+              成员
+            </el-button>
+
+            <el-button
+              type="danger"
+              size="small"
+              @click="handleDelete(scope.row.id)"
+            >
+              删除
+            </el-button>
+
+          </template>
+
+        </el-table-column>
+
+      </el-table>
+
+      <!-- 分页 -->
+
+      <div class="pagination">
+
+        <el-pagination
+          background
+          layout="total, prev, pager, next"
+          :total="total"
+          :page-size="pageSize"
+          :current-page="pageNum"
+          @current-change="handlePageChange"
+        />
+
+      </div>
+
+    </el-card>
+
+    <!-- 新增/编辑项目 -->
+
+    <el-dialog
+      v-model="dialogVisible"
+      :title="isEdit ? '编辑项目' : '新增项目'"
+      width="600px"
+    >
+
+      <el-form
+        :model="form"
+        label-width="100px"
+      >
+
+        <el-form-item label="项目名称">
+
+          <el-input v-model="form.name" />
+
         </el-form-item>
+
+        <el-form-item label="项目描述">
+
+          <el-input
+            v-model="form.description"
+            type="textarea"
+            :rows="4"
+          />
+
+        </el-form-item>
+
+        <el-form-item label="项目状态">
+
+          <el-select
+            v-model="form.status"
+            style="width:100%"
+          >
+
+            <el-option
+              label="进行中"
+              :value="1"
+            />
+
+            <el-option
+              label="已完成"
+              :value="2"
+            />
+
+            <el-option
+              label="已暂停"
+              :value="3"
+            />
+
+          </el-select>
+
+        </el-form-item>
+
       </el-form>
+
       <template #footer>
-        <el-button @click="dialogVisible=false">取消</el-button>
-        <el-button type="primary" @click="saveProject">保存</el-button>
+
+        <el-button @click="dialogVisible = false">
+          取消
+        </el-button>
+
+        <el-button
+          type="primary"
+          @click="submitForm"
+        >
+          确定
+        </el-button>
+
       </template>
+
     </el-dialog>
+
+    <!-- 项目成员 -->
+
+    <el-dialog
+      v-model="memberDialogVisible"
+      title="项目成员"
+      width="600px"
+    >
+
+      <div class="member-toolbar">
+
+        <el-input
+          v-model="memberForm.userId"
+          placeholder="请输入用户ID"
+          style="width:200px"
+        />
+
+        <el-button
+          type="primary"
+          @click="addMember"
+        >
+          添加成员
+        </el-button>
+
+      </div>
+
+      <el-table
+        :data="memberList"
+        border
+        stripe
+      >
+
+        <el-table-column
+          prop="userId"
+          label="用户ID"
+        />
+
+        <el-table-column
+          prop="username"
+          label="用户名"
+        />
+
+        <el-table-column
+          prop="nickname"
+          label="昵称"
+        />
+
+      </el-table>
+
+    </el-dialog>
+
   </div>
+
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { requestWithType } from '../utils/request'
-import { ElMessage } from 'element-plus'
 
-interface Project {
-  id: number
-  name: string
-  description: string
-  status: number
-}
+import {
 
-const list = ref<Project[]>([])
-const loading = ref(false)
+  ref,
+  reactive,
+  onMounted
+
+} from 'vue'
+
+import {
+
+  ElMessage,
+  ElMessageBox
+
+} from 'element-plus'
+
+import request from '../utils/request'
+
+const tableData = ref([])
+
+const total = ref(0)
+
+const pageNum = ref(1)
+
+const pageSize = ref(10)
+
+const keyword = ref('')
+
+const status = ref()
+
 const dialogVisible = ref(false)
-const dialogTitle = ref('新增项目')
-const form = ref<Project>({id:0,name:'',description:'',status:0})
 
-const statusText = (status:number) => {
-  switch(status){ case 0: return '未开始'; case 1: return '进行中'; case 2: return '已完成'; default: return ''; }
+const memberDialogVisible = ref(false)
+
+const isEdit = ref(false)
+
+const currentProjectId = ref()
+
+const memberList = ref([])
+
+const form = reactive<any>({
+
+  id:null,
+
+  name:'',
+
+  description:'',
+
+  status:1
+})
+
+const memberForm = reactive<any>({
+
+  projectId:null,
+
+  userId:''
+})
+
+/**
+ * 项目分页
+ */
+const loadProjectList = async ()=>{
+
+  try{
+
+    const res:any = await request({
+
+      url:'/project/page',
+
+      method:'get',
+
+      params:{
+
+        pageNum:pageNum.value,
+
+        pageSize:pageSize.value,
+
+        keyword:keyword.value,
+
+        status:status.value
+      }
+    })
+
+    tableData.value = res.data.records || []
+
+    total.value = res.data.total || 0
+
+  }catch(error){
+
+    console.log(error)
+  }
 }
 
-const fetchList = async () => {
-  loading.value = true
-  try {
-    const res = await requestWithType<{ code:number, data:Project[], message:string }>({url:'/project/list', method:'get'})
-    if(res.code===200) list.value = res.data
-  } finally { loading.value = false }
+/**
+ * 分页切换
+ */
+const handlePageChange = (page:number)=>{
+
+  pageNum.value = page
+
+  loadProjectList()
 }
 
-const openDialog = (row?:Project) => {
-  if(row){ dialogTitle.value='编辑项目'; form.value={...row} }
-  else{ dialogTitle.value='新增项目'; form.value={id:0,name:'',description:'',status:0} }
+/**
+ * 新增
+ */
+const openAddDialog = ()=>{
+
+  isEdit.value = false
+
+  resetForm()
+
   dialogVisible.value = true
 }
 
-const saveProject = async () => {
-  try{
-    if(form.value.id) await requestWithType({url:'/project/update', method:'put', data:form.value})
-    else await requestWithType({url:'/project/add', method:'post', data:form.value})
-    ElMessage.success('操作成功')
-    dialogVisible.value=false
-    fetchList()
-  }catch{ ElMessage.error('操作失败') }
+/**
+ * 编辑
+ */
+const handleEdit = (row:any)=>{
+
+  isEdit.value = true
+
+  Object.assign(form,row)
+
+  dialogVisible.value = true
 }
 
-const deleteProject = async (id:number) => {
+/**
+ * 提交
+ */
+const submitForm = async ()=>{
+
   try{
-    await requestWithType({url:`/project/delete/${id}`, method:'delete'})
+
+    if(isEdit.value){
+
+      await request({
+
+        url:'/project/update',
+
+        method:'put',
+
+        data:form
+      })
+
+      ElMessage.success('修改成功')
+
+    }else{
+
+      await request({
+
+        url:'/project/add',
+
+        method:'post',
+
+        data:form
+      })
+
+      ElMessage.success('新增成功')
+    }
+
+    dialogVisible.value = false
+
+    loadProjectList()
+
+  }catch(error){
+
+    console.log(error)
+  }
+}
+
+/**
+ * 删除
+ */
+const handleDelete = (id:number)=>{
+
+  ElMessageBox.confirm(
+
+    '确认删除该项目吗？',
+
+    '提示',
+
+    {
+
+      type:'warning'
+    }
+
+  ).then(async ()=>{
+
+    await request({
+
+      url:`/project/delete/${id}`,
+
+      method:'delete'
+    })
+
     ElMessage.success('删除成功')
-    fetchList()
-  }catch{ ElMessage.error('删除失败') }
+
+    loadProjectList()
+  })
 }
 
-onMounted(()=>fetchList())
+/**
+ * 成员管理
+ */
+const handleMember = async (row:any)=>{
+
+  currentProjectId.value = row.id
+
+  memberForm.projectId = row.id
+
+  memberDialogVisible.value = true
+
+  loadMemberList()
+}
+
+/**
+ * 成员列表
+ */
+const loadMemberList = async ()=>{
+
+  const res:any = await request({
+
+    url:`/project/member/list/${currentProjectId.value}`,
+
+    method:'get'
+  })
+
+  memberList.value = res.data || []
+}
+
+/**
+ * 添加成员
+ */
+const addMember = async ()=>{
+
+  await request({
+
+    url:'/project/member/add',
+
+    method:'post',
+
+    data:memberForm
+  })
+
+  ElMessage.success('添加成员成功')
+
+  memberForm.userId = ''
+
+  loadMemberList()
+}
+
+/**
+ * 重置表单
+ */
+const resetForm = ()=>{
+
+  form.id = null
+
+  form.name = ''
+
+  form.description = ''
+
+  form.status = 1
+}
+
+onMounted(()=>{
+
+  loadProjectList()
+})
+
 </script>
+
+<style scoped>
+
+.project-container{
+
+  display:flex;
+
+  flex-direction:column;
+
+  gap:20px;
+}
+
+.toolbar{
+
+  display:flex;
+
+  justify-content:space-between;
+
+  align-items:center;
+}
+
+.left{
+
+  display:flex;
+
+  gap:10px;
+}
+
+.pagination{
+
+  margin-top:20px;
+
+  display:flex;
+
+  justify-content:flex-end;
+}
+
+.member-toolbar{
+
+  display:flex;
+
+  gap:10px;
+
+  margin-bottom:20px;
+}
+
+</style>
