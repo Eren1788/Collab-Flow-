@@ -7,6 +7,7 @@ import com.collab.dto.UserRegisterDTO;
 import com.collab.dto.UserUpdateDTO;
 import com.collab.entity.User;
 import com.collab.vo.UserVO;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.List;
 import java.util.Map;
@@ -31,4 +32,5 @@ public interface UserService extends IService<User> {
 
     void deleteUser(Long id);
 
+    void logout(HttpServletRequest request);
 }

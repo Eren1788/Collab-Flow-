@@ -8,6 +8,7 @@ import com.collab.service.UserService;
 import com.collab.vo.UserVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
@@ -110,6 +111,17 @@ public class UserController {
     public Result<Void> delete(@PathVariable Long id){
         log.info("删除用户:{}",id);
         userService.deleteUser(id);
+        return Result.success();
+    }
+
+    /**
+     * 退出登录
+     */
+    @Operation(summary = "退出登录")
+    @PostMapping("/logout")
+    public Result<Void> logout(HttpServletRequest request){
+        log.info("退出登录:{}",request);
+        userService.logout(request);
         return Result.success();
     }
 

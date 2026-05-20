@@ -16,9 +16,11 @@ spring:
   #redis
   data:
     redis:
-      host: localhost
-      port: 6379
-      database: 0
+      host: 192.168.100.128
+      port: 6380
+      password: collab123
+      database: 0 # 新容器中直接用默认库
+      connect-timeout: 5000
 
 #mybatis-plus的配置
 mybatis-plus:

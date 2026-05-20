@@ -1,28 +1,32 @@
 package com.collab.common.interceptor;
 
+import com.collab.common.constant.RedisConstant;
 import com.collab.common.utils.JwtUtils;
 import com.collab.common.utils.LoginUserContext;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import java.util.Date;
+import java.util.concurrent.TimeUnit;
 
 /**
  * JWT 登录拦截器
  *  下一步注册拦截器-WebConfig
  */
 @Slf4j
+@RequiredArgsConstructor
 public class JwtInterceptor implements HandlerInterceptor{
-    @Override
-    public boolean preHandle(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            Object handler) throws Exception {
 
+    private final RedisTemplate<String,Object> redisTemplate;
+
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         log.info("登录拦截器，开始拦截!");
         
         //1.获取 Authorization
@@ -67,11 +71,27 @@ public class JwtInterceptor implements HandlerInterceptor{
             }
             
             Long userId = ((Number) userIdObj).longValue();
-            
+
             //9.验证 userId 是否有效
             if (userId <= 0) {
                 log.warn("JWT 令牌中的 userId 无效: {}", userId);
                 throw new JwtException("令牌无效，用户信息错误");
+            }
+
+            //10.Redis 校验：使用 userId 作为 key，避免长 token 浪费内存
+            String redisKey = RedisConstant.LOGIN_TOKEN + userId;
+            Object cache = redisTemplate.opsForValue().get(redisKey);
+            
+            if (cache == null){
+                log.warn("Redis 中未找到用户 {} 的登录信息，可能已退出登录", userId);
+                throw new JwtException("登录已过期，请重新登录");
+            }
+            
+            //11.自动续期：仅在剩余时间少于 1 天时续期，避免频繁写入 Redis
+            Long expireTime = redisTemplate.getExpire(redisKey, TimeUnit.SECONDS);
+            if (expireTime != null && expireTime < 86400) { // 少于 1 天
+                redisTemplate.expire(redisKey, 7, TimeUnit.DAYS);
+                log.debug("用户 {} 的登录状态已续期", userId);
             }
 
             //10.保存当前用户到 ThreadLocal

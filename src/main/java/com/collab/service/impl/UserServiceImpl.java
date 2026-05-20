@@ -3,6 +3,7 @@ package com.collab.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.collab.common.constant.RedisConstant;
 import com.collab.common.exception.BusinessException;
 import com.collab.common.utils.LoginUserContext;
 import com.collab.dto.LoginDTO;
@@ -13,28 +14,36 @@ import com.collab.mapper.UserMapper;
 import com.collab.service.UserService;
 import com.collab.common.utils.JwtUtils;
 import com.collab.vo.UserVO;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
 
     private final UserMapper userMapper;
+    private final RedisTemplate<String,Object> redisTemplate;
+
     @Override
     public Map<String, Object> login(LoginDTO loginDTO) {
 
+        // 构建查询条件：根据用户名查询用户
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
-
         wrapper.eq(User::getUsername,loginDTO.getUsername());
 
+        // 执行数据库查询，获取用户信息
         User user = userMapper.selectOne(wrapper);
 
         if(user == null){
@@ -45,12 +54,23 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             throw new BusinessException("密码错误");
         }
 
-        //创建token
+        //生成JWT
         String token = JwtUtils.creatToken(user.getId(),user.getUsername());
 
-        Map<String,Object> map = new HashMap<>();
+        //生成redis key：使用 userId 作为 key，避免长 token 浪费内存
+        String redisKey = RedisConstant.LOGIN_TOKEN + user.getId();
 
+        //保存redis：存储用户ID，过期时间 7 天
+        redisTemplate.opsForValue().set(
+                redisKey,
+                user.getId(),
+                7,
+                TimeUnit.DAYS
+        );
+
+        Map<String,Object> map = new HashMap<>();
         map.put("token",token);
+        map.put("userInfo",user);
 
         return map;
     }
@@ -174,5 +194,19 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     @Override
     public void deleteUser(Long id) {
         userMapper.deleteById(id);
+    }
+
+    @Override
+    public void logout(HttpServletRequest request) {
+        // 获取当前登录用户ID
+        Long userId = LoginUserContext.getUserId();
+        if (userId == null) {
+            return;
+        }
+        
+        // 使用 userId 作为 Redis key，删除登录状态
+        String redisKey = RedisConstant.LOGIN_TOKEN + userId;
+        redisTemplate.delete(redisKey);
+        log.info("用户 {} 已退出登录", userId);
     }
 }
