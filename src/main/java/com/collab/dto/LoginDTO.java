@@ -1,13 +1,15 @@
 package com.collab.dto;
 
-import com.baomidou.mybatisplus.annotation.TableName;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 @Data
-@TableName("LoginDTO")
+@Schema(description = "登录DTO")
 public class LoginDTO {
 
+    @Schema(description = "用户名")
     private String username;
 
+    @Schema(description = "密码")
     private String password;
 }

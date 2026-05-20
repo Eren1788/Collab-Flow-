@@ -18,13 +18,12 @@ public class WebConfig implements WebMvcConfigurer {
                 .excludePathPatterns(
                         "/user/login",
                         "/user/register",
+                        // knife4j的路径
                         "/doc.html",
-//                        "/v3/api-docs/**",
-//                        "/webjars/**",
-//                        "/swagger-resources/**",
-//                        "/swagger-ui/**"
                         "/swagger-ui/**",
-                        "/v3/api-docs/**"
+                        "/swagger-resources/**",
+                        "/v3/api-docs/**",
+                        "/webjars/**"
                 );
     }
 }

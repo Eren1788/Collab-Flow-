@@ -2,18 +2,19 @@ package com.collab.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.time.LocalDateTime;
 
 @Data
-@TableName("user")
+@Schema(description = "用户实体")
 public class User {
 
-    @TableId(type = IdType.AUTO)
+    @Schema(description = "用户ID")
     private Long id;
 
+    @Schema(description = "用户名")
     private String username;
 
     private String password;
