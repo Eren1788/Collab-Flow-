@@ -5,4 +5,47 @@
 
 <mapper namespace="com.collab.mapper.UserMapper">
 
+    <select id="selectUserPage" resultType="com.collab.vo.UserVO">
+        SELECT
+        u.id,
+        u.username,
+        u.nickname,
+        u.avatar,
+        u.email,
+        u.phone,
+        u.status,
+        u.create_time,
+        r.role_name AS roleName
+        FROM user u
+        LEFT JOIN user_role ur
+        ON u.id = ur.user_id
+        LEFT JOIN role r
+        ON ur.role_id = r.id
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND u.username LIKE CONCAT('%', #{keyword}, '%')
+            </if>
+        </where>
+        ORDER BY u.id DESC
+    </select>
+
+    <select id="selectUserListWithRole" resultType="com.collab.vo.UserVO">
+        SELECT
+            u.id,
+            u.username,
+            u.nickname,
+            u.avatar,
+            u.email,
+            u.phone,
+            u.status,
+            u.create_time,
+            r.role_name AS roleName
+        FROM user u
+                 LEFT JOIN user_role ur
+                           ON u.id = ur.user_id
+                 LEFT JOIN role r
+                           ON ur.role_id = r.id
+        ORDER BY u.id DESC
+    </select>
+
 </mapper>

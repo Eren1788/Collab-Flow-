@@ -14,4 +14,11 @@ public class UserUpdateDTO {
     private String email;
 
     private String phone;
+
+    /**
+     * 用户状态
+     * 1 启用
+     * 0 禁用
+     */
+    private Integer status;
 }

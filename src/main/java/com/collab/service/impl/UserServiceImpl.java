@@ -58,6 +58,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             throw new BusinessException("密码错误");
         }
 
+        if(user.getStatus() != 1){
+            throw new BusinessException("该账号已被禁用，请联系管理员admin");
+        }
+
         //生成JWT
         String token = JwtUtils.creatToken(user.getId(),user.getUsername());
 
@@ -80,41 +84,61 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)//加事务防止注册时涉及的两张表出现脏数据
     public void register(UserRegisterDTO dto) {
+        /**
+         * 1. 校验用户名是否存在
+         */
+        User existUser = lambdaQuery()
+                .eq(User::getUsername, dto.getUsername())
+                .one();
 
-        // 判断用户名是否存在
-        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
-
-        wrapper.eq(
-                User::getUsername,
-                dto.getUsername()
-        );
-
-        Long count = userMapper.selectCount(wrapper);
-
-        if(count > 0){
-            throw new BusinessException("用户名已存在");
+        if (existUser != null) {
+            throw new RuntimeException("用户名已存在");
         }
 
-        // 保存用户
+        /**
+         * 2. 创建用户
+         */
         User user = new User();
 
-        BeanUtils.copyProperties(dto,user);
+        // 用户名
+        user.setUsername(dto.getUsername());
 
-        // 用户状态：1正常
+        // 密码
+        user.setPassword(dto.getPassword());
+
+        // 昵称
+        user.setNickname(dto.getNickname());
+
+        // 邮箱
+        user.setEmail(dto.getEmail());
+
+        // 手机号
+        user.setPhone(dto.getPhone());
+
+        // 默认状态：启用
         user.setStatus(1);
 
-        userMapper.insert(user);
+        /**
+         * 保存用户
+         */
+        save(user);
 
-        // 自动绑定默认角色：USER
+        /**
+         * 3. 绑定角色
+         */
         UserRole userRole = new UserRole();
 
+        // 用户ID
         userRole.setUserId(user.getId());
 
-        // 3 = 普通成员(USER)
-        userRole.setRoleId(3L);
+        // 角色ID
+        userRole.setRoleId(dto.getRoleId());
 
+        /**
+         * 保存用户角色关系
+         */
         userRoleMapper.insert(userRole);
     }
 
@@ -135,18 +159,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     @Override
     public List<UserVO> listUser() {
-
-        List<User> users = userMapper.selectList(null);
-
-        return users.stream().map(user -> {
-
-            UserVO vo = new UserVO();
-
-            BeanUtils.copyProperties(user,vo);
-
-            return vo;
-
-        }).collect(Collectors.toList());
+        return userMapper.selectUserListWithRole();
     }
 
     @Override
@@ -154,38 +167,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
                                  Integer pageSize,
                                  String keyword) {
 
-        Page<User> page = new Page<>(pageNum,pageSize);
+        Page<UserVO> page = new Page<>(pageNum, pageSize);
 
-        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
-
-        wrapper.like(
-                StringUtils.hasText(keyword),
-                User::getUsername,
-                keyword
-        );
-
-        Page<User> userPage = userMapper.selectPage(page,wrapper);
-
-        Page<UserVO> result = new Page<>();
-
-        BeanUtils.copyProperties(userPage,result);
-
-        List<UserVO> records =
-                userPage.getRecords()
-                        .stream()
-                        .map(user -> {
-
-                            UserVO vo = new UserVO();
-
-                            BeanUtils.copyProperties(user,vo);
-
-                            return vo;
-
-                        }).collect(Collectors.toList());
-
-        result.setRecords(records);
-
-        return result;
+        return userMapper.selectUserPage(page, keyword);
     }
 
     @Override
@@ -203,11 +187,47 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     @Override
     public void updateUser(UserUpdateDTO dto) {
 
-        User user = new User();
+        User dbUser = userMapper.selectById(dto.getId());
 
-        BeanUtils.copyProperties(dto,user);
+        if(dbUser == null){
+            throw new BusinessException("用户不存在");
+        }
 
-        userMapper.updateById(user);
+        // 普通信息允许修改
+        if(dto.getNickname() != null){
+            dbUser.setNickname(dto.getNickname());
+        }
+
+        if(dto.getAvatar() != null){
+            dbUser.setAvatar(dto.getAvatar());
+        }
+
+        if(dto.getEmail() != null){
+            dbUser.setEmail(dto.getEmail());
+        }
+
+        if(dto.getPhone() != null){
+            dbUser.setPhone(dto.getPhone());
+        }
+
+        /**
+         * 状态修改：只有 admin 可以
+         */
+        if(dto.getStatus() != null){
+
+            Long currentUserId = LoginUserContext.getUserId();
+
+            // 查询当前用户是否 admin
+            boolean isAdmin = userRoleMapper.existsAdminRole(currentUserId);
+
+            if(!isAdmin){
+                throw new BusinessException("只有管理员才能修改用户状态");
+            }
+
+            dbUser.setStatus(dto.getStatus());
+        }
+
+        userMapper.updateById(dbUser);
     }
 
     @Override
