@@ -5,62 +5,43 @@ import websocket from '../utils/websocket'
 export const useUserStore = defineStore('user', {
 
   state: () => ({
-
     token: localStorage.getItem('token') || '',
-
     info: JSON.parse(localStorage.getItem('userInfo') || '{}')
-
   }),
 
+  getters: {
+    //新增 hasPermission getter
+    hasPermission: (state) => {
+      return (permission: string): boolean => {
+        return Array.isArray(state.info?.permissions) && 
+               state.info.permissions.includes(permission)
+      }
+    }
+  },
+
   actions: {
-
-    /**
-     * 设置token
-     */
+    // ... 原有 actions 不变
     setToken(token: string){
-
       this.token = token
-
       localStorage.setItem('token', token)
     },
 
-    /**
-     * 设置用户信息
-     */
     setUserInfo(info: any){
-
       this.info = info
-
-      localStorage.setItem(
-        'userInfo',
-        JSON.stringify(info)
-      )
+      localStorage.setItem('userInfo', JSON.stringify(info))
     },
 
-    /**
-     * 建立WebSocket连接
-     */
     connectWebSocket(){
-
       if(this.info?.id){
-
         websocket.connect(this.info.id)
       }
     },
 
-    /**
-     * 退出登录
-     */
     logout(){
-
       this.token = ''
-
       this.info = {}
-
       localStorage.removeItem('token')
-
       localStorage.removeItem('userInfo')
-
       websocket.disconnect()
     }
   }

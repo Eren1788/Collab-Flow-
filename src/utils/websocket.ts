@@ -5,12 +5,23 @@ class WebSocketService {
   private socket: WebSocket | null = null
 
   /**
+   * 消息监听器
+   */
+  private listeners: Array<(data:any)=>void> = []
+
+  /**
    * 建立连接
    */
-  connect(userId: number) {
+  connect(userId:number){
 
-    // 避免重复连接
-    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+    /**
+     * 避免重复连接
+     */
+    if(
+      this.socket
+      &&
+      this.socket.readyState === WebSocket.OPEN
+    ){
       return
     }
 
@@ -21,7 +32,7 @@ class WebSocketService {
     /**
      * 连接成功
      */
-    this.socket.onopen = () => {
+    this.socket.onopen = ()=>{
 
       console.log('WebSocket连接成功')
     }
@@ -29,43 +40,75 @@ class WebSocketService {
     /**
      * 接收消息
      */
-    this.socket.onmessage = (event) => {
+    this.socket.onmessage = (event)=>{
 
-      console.log('收到WebSocket消息：', event.data)
+      console.log('收到WebSocket消息：',event.data)
 
       const data = JSON.parse(event.data)
 
+      /**
+       * 全局通知弹窗
+       */
       ElNotification({
-        title: '系统通知',
-        message: data.content,
-        type: 'success',
-        duration: 3000
+
+        title:'系统通知',
+
+        message:data.content,
+
+        type:'success',
+
+        duration:3000
+      })
+
+      /**
+       * 通知所有监听器
+       */
+      this.listeners.forEach(callback=>{
+
+        callback(data)
       })
     }
 
     /**
-     * 连接关闭
+     * 关闭
      */
-    this.socket.onclose = () => {
+    this.socket.onclose = ()=>{
 
       console.log('WebSocket已断开')
     }
 
     /**
-     * 连接异常
+     * 异常
      */
-    this.socket.onerror = (error) => {
+    this.socket.onerror = (error)=>{
 
-      console.error('WebSocket异常', error)
+      console.error('WebSocket异常',error)
     }
   }
 
   /**
-   * 关闭连接
+   * 注册监听器
    */
-  disconnect() {
+  addMessageListener(callback:(data:any)=>void){
 
-    if (this.socket) {
+    this.listeners.push(callback)
+  }
+
+  /**
+   * 移除监听器
+   */
+  removeMessageListener(callback:(data:any)=>void){
+
+    this.listeners =
+      this.listeners.filter(item=>item !== callback)
+  }
+
+  /**
+   * 断开连接
+   */
+  disconnect(){
+
+    if(this.socket){
 
       this.socket.close()
 
@@ -76,12 +119,13 @@ class WebSocketService {
   /**
    * 发送消息
    */
-  send(message: string) {
+  send(message:string){
 
-    if (
-      this.socket &&
+    if(
+      this.socket
+      &&
       this.socket.readyState === WebSocket.OPEN
-    ) {
+    ){
 
       this.socket.send(message)
     }
