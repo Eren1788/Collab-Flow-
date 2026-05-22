@@ -16,6 +16,11 @@ public class UserVO {
     private String avatar;
 
     /**
+     * 角色ID
+     */
+    private Long roleId;
+
+    /**
      * 职位名称
      */
     private String roleName;

@@ -16,6 +16,11 @@ public class UserUpdateDTO {
     private String phone;
 
     /**
+     * 角色ID
+     */
+    private Long roleId;
+
+    /**
      * 用户状态
      * 1 启用
      * 0 禁用

@@ -185,49 +185,82 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void updateUser(UserUpdateDTO dto) {
-
         User dbUser = userMapper.selectById(dto.getId());
 
-        if(dbUser == null){
+        if (dbUser == null) {
             throw new BusinessException("用户不存在");
         }
 
-        // 普通信息允许修改
-        if(dto.getNickname() != null){
+        /**
+         * 普通信息修改
+         */
+        if (dto.getNickname() != null) {
             dbUser.setNickname(dto.getNickname());
         }
 
-        if(dto.getAvatar() != null){
+        if (dto.getAvatar() != null) {
             dbUser.setAvatar(dto.getAvatar());
         }
 
-        if(dto.getEmail() != null){
+        if (dto.getEmail() != null) {
             dbUser.setEmail(dto.getEmail());
         }
 
-        if(dto.getPhone() != null){
+        if (dto.getPhone() != null) {
             dbUser.setPhone(dto.getPhone());
         }
 
         /**
-         * 状态修改：只有 admin 可以
+         * 状态修改
          */
-        if(dto.getStatus() != null){
+        if (dto.getStatus() != null) {
 
             Long currentUserId = LoginUserContext.getUserId();
 
-            // 查询当前用户是否 admin
             boolean isAdmin = userRoleMapper.existsAdminRole(currentUserId);
 
-            if(!isAdmin){
+            if (!isAdmin) {
                 throw new BusinessException("只有管理员才能修改用户状态");
             }
 
             dbUser.setStatus(dto.getStatus());
         }
 
+        /**
+         * 更新 user 表
+         */
         userMapper.updateById(dbUser);
+
+        /**
+         * 修改角色（职位）
+         */
+        if (dto.getRoleId() != null) {
+
+            LambdaQueryWrapper<UserRole> wrapper = new LambdaQueryWrapper<>();
+
+            wrapper.eq(UserRole::getUserId, dto.getId());
+
+            UserRole userRole = userRoleMapper.selectOne(wrapper);
+
+            if (userRole != null) {
+
+                userRole.setRoleId(dto.getRoleId());
+
+                userRoleMapper.updateById(userRole);
+
+            } else {
+
+                UserRole newUserRole = new UserRole();
+
+                newUserRole.setUserId(dto.getId());
+
+                newUserRole.setRoleId(dto.getRoleId());
+
+                userRoleMapper.insert(newUserRole);
+            }
+        }
     }
 
     @Override

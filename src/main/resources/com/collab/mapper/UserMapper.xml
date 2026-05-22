@@ -15,6 +15,7 @@
         u.phone,
         u.status,
         u.create_time,
+        r.id AS roleId,
         r.role_name AS roleName
         FROM user u
         LEFT JOIN user_role ur
@@ -39,6 +40,7 @@
             u.phone,
             u.status,
             u.create_time,
+            r.id AS roleId,
             r.role_name AS roleName
         FROM user u
                  LEFT JOIN user_role ur
