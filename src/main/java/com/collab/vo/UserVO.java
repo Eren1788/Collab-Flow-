@@ -3,6 +3,7 @@ package com.collab.vo;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class UserVO {
@@ -46,4 +47,9 @@ public class UserVO {
      * 创建时间
      */
     private LocalDateTime createTime;
+
+    /**
+     * 权限列表
+     */
+    private List<String> permissions;
 }

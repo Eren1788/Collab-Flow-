@@ -8,4 +8,6 @@ import org.apache.ibatis.annotations.Mapper;
 public interface UserRoleMapper extends BaseMapper<UserRole> {
 
     boolean existsAdminRole(Long userId);
+
+    Long getRoleIdByUserId(Long userId);
 }

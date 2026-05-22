@@ -24,4 +24,6 @@ public interface RoleMapper extends BaseMapper<Role> {
             ORDER BY id
             """)
     List<RoleVO> getRoleList();
+
+    String getRoleNameById(Long roleId);
 }

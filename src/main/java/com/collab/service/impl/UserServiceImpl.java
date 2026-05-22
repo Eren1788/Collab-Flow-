@@ -11,6 +11,8 @@ import com.collab.dto.UserRegisterDTO;
 import com.collab.dto.UserUpdateDTO;
 import com.collab.entity.User;
 import com.collab.entity.UserRole;
+import com.collab.mapper.PermissionMapper;
+import com.collab.mapper.RoleMapper;
 import com.collab.mapper.UserMapper;
 import com.collab.mapper.UserRoleMapper;
 import com.collab.service.UserService;
@@ -25,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +42,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     private final UserMapper userMapper;
     private final RedisTemplate<String,Object> redisTemplate;
     private final UserRoleMapper userRoleMapper;
+    private final RoleMapper roleMapper;
+    private final PermissionMapper permissionMapper;
 
     @Override
     public Map<String, Object> login(LoginDTO loginDTO) {
@@ -145,14 +150,42 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     @Override
     public UserVO getCurrentUserInfo() {
 
-        //Long userId = 1L;
         Long userId = LoginUserContext.getUserId();
 
         User user = userMapper.selectById(userId);
 
+        if(user == null){
+            throw new BusinessException("用户不存在");
+        }
+
         UserVO vo = new UserVO();
 
-        BeanUtils.copyProperties(user,vo);
+        BeanUtils.copyProperties(user, vo);
+
+        /**
+         * 查询角色
+         */
+        Long roleId = userRoleMapper.getRoleIdByUserId(userId);
+
+        vo.setRoleId(roleId);
+
+        if(roleId != null){
+
+            String roleName = roleMapper.getRoleNameById(roleId);
+
+            vo.setRoleName(roleName);
+        }
+
+        /**
+         * 查询权限
+         */
+        List<String> permissions = permissionMapper.getPermissionCodesByUserId(userId);
+
+        if (permissions == null) {
+            permissions = new ArrayList<>();
+        }
+
+        vo.setPermissions(permissions);
 
         return vo;
     }
@@ -187,6 +220,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateUser(UserUpdateDTO dto) {
+
         User dbUser = userMapper.selectById(dto.getId());
 
         if (dbUser == null) {
@@ -194,7 +228,19 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         }
 
         /**
+         * 当前登录用户
+         */
+        Long currentUserId = LoginUserContext.getUserId();
+
+
+        /**
+         * 是否管理员
+         */
+        boolean isAdmin = userRoleMapper.existsAdminRole(currentUserId);
+
+        /**
          * 普通信息修改
+         * 普通成员也允许
          */
         if (dto.getNickname() != null) {
             dbUser.setNickname(dto.getNickname());
@@ -214,12 +260,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
         /**
          * 状态修改
+         * 只有管理员允许
          */
         if (dto.getStatus() != null) {
-
-            Long currentUserId = LoginUserContext.getUserId();
-
-            boolean isAdmin = userRoleMapper.existsAdminRole(currentUserId);
 
             if (!isAdmin) {
                 throw new BusinessException("只有管理员才能修改用户状态");
@@ -235,14 +278,21 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
         /**
          * 修改角色（职位）
+         * 只有管理员允许
          */
         if (dto.getRoleId() != null) {
 
-            LambdaQueryWrapper<UserRole> wrapper = new LambdaQueryWrapper<>();
+            if (!isAdmin) {
+                throw new BusinessException("只有管理员才能修改职位");
+            }
+
+            LambdaQueryWrapper<UserRole> wrapper =
+                    new LambdaQueryWrapper<>();
 
             wrapper.eq(UserRole::getUserId, dto.getId());
 
-            UserRole userRole = userRoleMapper.selectOne(wrapper);
+            UserRole userRole =
+                    userRoleMapper.selectOne(wrapper);
 
             if (userRole != null) {
 
