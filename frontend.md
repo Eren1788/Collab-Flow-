@@ -11,6 +11,7 @@ Collab Flow 前端基于：
 * Pinia
 * Axios
 * Vue Router
+* WebSocket
 
 开发的企业级智能任务协作系统前端。
 
@@ -26,18 +27,19 @@ Collab Flow 前端基于：
 
 ---
 
-# 2️⃣ 前端技术栈
+# 2️⃣ 技术栈
 
 | 技术 | 说明 |
 | --- | --- |
-| Vue3 | 核心框架 |
+| Vue3 | 核心框架（组合式 API） |
 | TypeScript | 类型安全 |
 | Vite | 前端构建工具 |
 | Vue Router | 路由管理 |
 | Pinia | 状态管理 |
 | Axios | 网络请求 |
-| Element Plus | UI组件库 |
-| ECharts | 图表统计（可选） |
+| Element Plus | UI组件库（v2.x） |
+| WebSocket | 实时通知 |
+| Element Plus Icons | 图标库 |
 
 ---
 
@@ -69,29 +71,30 @@ npm create vite@latest collab-flow-web
 npm install
 npm install element-plus axios pinia vue-router
 npm install @element-plus/icons-vue
-npm install echarts
 ```
+
+⚠️ **注意**: Element Plus 使用稳定版 v2.x，不要指定 3.x 版本。
 
 ---
 
-# 6️⃣ 推荐目录结构（完整版）
+# 6️⃣ 推荐目录结构
 
 ```text
 src
 ├── api
-│   ├── user.ts
-│   ├── project.ts
-│   ├── task.ts
-│   ├── comment.ts
-│   └── file.ts
+│   ├── user.ts          # 用户相关API
+│   ├── project.ts       # 项目相关API
+│   ├── task.ts          # 任务相关API
+│   ├── comment.ts       # 评论相关API
+│   └── file.ts          # 文件相关API
 │
 ├── assets
 │
 ├── components
 │   ├── Layout
-│   │   ├── Header.vue
-│   │   ├── Sidebar.vue
-│   │   └── Footer.vue
+│   │   ├── Header.vue   # 顶部导航
+│   │   ├── Sidebar.vue  # 侧边栏菜单
+│   │   └── Footer.vue   # 底部信息
 │   │
 │   ├── Project
 │   │   ├── ProjectForm.vue
@@ -112,46 +115,29 @@ src
 │   └── index.vue
 │
 ├── router
-│   └── index.ts
+│   └── index.ts         # 路由配置（含守卫）
 │
 ├── store
-│   ├── user.ts
+│   ├── user.ts          # 用户状态（含权限）
 │   └── app.ts
 │
 ├── styles
 │   └── index.scss
 │
 ├── utils
-│   ├── request.ts
-│   ├── auth.ts
-│   └── validate.ts
+│   ├── request.ts       # Axios封装
+│   ├── auth.ts          # Token工具
+│   ├── validate.ts      # 表单验证
+│   └── websocket.ts     # WebSocket封装
 │
 ├── views
-│   ├── login
-│   │   └── index.vue
-│   │
-│   ├── dashboard
-│   │   └── index.vue
-│   │
-│   ├── user
-│   │   ├── list.vue
-│   │   └── profile.vue
-│   │
-│   ├── project
-│   │   ├── list.vue
-│   │   ├── detail.vue
-│   │   └── member.vue
-│   │
-│   ├── task
-│   │   ├── list.vue
-│   │   ├── detail.vue
-│   │   └── statistics.vue
-│   │
-│   ├── comment
-│   │   └── index.vue
-│   │
-│   └── file
-│       └── index.vue
+│   ├── Login.vue        # 登录/注册页面
+│   ├── Home.vue         # 工作台/仪表盘
+│   ├── UserList.vue     # 用户管理（含个人信息）
+│   ├── ProjectList.vue  # 项目管理
+│   ├── TaskList.vue     # 任务管理（含统计）
+│   ├── CommentList.vue  # 评论列表
+│   └── FileList.vue     # 文件管理
 │
 ├── App.vue
 ├── main.ts
@@ -177,22 +163,22 @@ http://localhost:5173
 
 # 8️⃣ Vite 跨域代理配置
 
-vite.config.ts
+**vite.config.ts**
 
-必须配置代理。
-
-因为后端：
-
-```text
-http://localhost:8080
-```
+必须配置代理，因为后端地址为 `http://localhost:8080`。
 
 ```typescript
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import path from 'path'
 
 export default defineConfig({
   plugins: [vue()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, 'src')
+    }
+  },
   server: {
     port: 5173,
     proxy: {
@@ -208,16 +194,15 @@ export default defineConfig({
 
 ---
 
-# 9️⃣ Axios 请求封装（重要）
+# 9️⃣ Axios 请求封装
 
-src/utils/request.ts
+**src/utils/request.ts**
 
 这里必须与后端接口路径一致。
 
 ```typescript
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
-import { getToken } from './auth'
 
 const request = axios.create({
   baseURL: '/api',
@@ -225,7 +210,7 @@ const request = axios.create({
 })
 
 request.interceptors.request.use(config => {
-  const token = getToken()
+  const token = localStorage.getItem('token')
   if(token){
     config.headers.Authorization = `Bearer ${token}`
   }
@@ -242,7 +227,7 @@ request.interceptors.response.use(
     return res
   },
   error => {
-    ElMessage.error(error.message)
+    ElMessage.error(error.message || '网络错误')
     return Promise.reject(error)
   }
 )
@@ -254,7 +239,7 @@ export default request
 
 # 🔟 Token 工具类
 
-src/utils/auth.ts
+**src/utils/auth.ts**
 
 ```typescript
 const TOKEN_KEY = 'COLLAB_FLOW_TOKEN'
@@ -276,46 +261,72 @@ export function removeToken(){
 
 # 1️⃣1️⃣ Pinia 用户状态管理
 
-src/store/user.ts
+**src/store/user.ts**
 
 ```typescript
 import { defineStore } from 'pinia'
-import { loginApi } from '@/api/user'
-import { setToken, removeToken } from '@/utils/auth'
+import websocket from '../utils/websocket'
 
 export const useUserStore = defineStore('user',{
   state:()=>({
-    token:'',
-    userInfo:{} as any
+    token: localStorage.getItem('token') || '',
+    info: JSON.parse(localStorage.getItem('userInfo') || '{}')
   }),
+  
+  getters:{
+    // 权限判断方法
+    hasPermission: (state) => {
+      return (permission: string): boolean => {
+        return Array.isArray(state.info?.permissions) && 
+               state.info.permissions.includes(permission)
+      }
+    }
+  },
+  
   actions:{
-    async login(loginForm:any){
-      const res:any = await loginApi(loginForm)
-      this.token = res.data.token
-      setToken(res.data.token)
+    setToken(token: string){
+      this.token = token
+      localStorage.setItem('token', token)
     },
+
+    setUserInfo(info: any){
+      this.info = info
+      localStorage.setItem('userInfo', JSON.stringify(info))
+    },
+
+    connectWebSocket(){
+      if(this.info?.id){
+        websocket.connect(this.info.id)
+      }
+    },
+
     logout(){
       this.token = ''
-      this.userInfo = {}
-      removeToken()
+      this.info = {}
+      localStorage.removeItem('token')
+      localStorage.removeItem('userInfo')
+      websocket.disconnect()
     }
   }
 })
 ```
 
+⚠️ **重要**: 用户信息存储在 `state.info` 中，访问权限时使用 `userStore.hasPermission('xxx')`。
+
 ---
 
-# 1️⃣2️⃣ 路由配置（完整版）
+# 1️⃣2️⃣ 路由配置
 
-src/router/index.ts
+**src/router/index.ts**
 
 ```typescript
 import { createRouter, createWebHistory } from 'vue-router'
+import { getToken } from '@/utils/auth'
 
 const routes = [
   {
     path:'/login',
-    component:()=>import('@/views/login/index.vue')
+    component:()=>import('@/views/Login.vue')
   },
   {
     path:'/',
@@ -324,35 +335,39 @@ const routes = [
     children:[
       {
         path:'dashboard',
-        component:()=>import('@/views/dashboard/index.vue')
+        name:'Dashboard',
+        component:()=>import('@/views/Home.vue'),
+        meta:{ title:'工作台' }
       },
       {
         path:'user/list',
-        component:()=>import('@/views/user/list.vue')
+        name:'UserList',
+        component:()=>import('@/views/UserList.vue'),
+        meta:{ title:'用户管理' }
       },
       {
         path:'project/list',
-        component:()=>import('@/views/project/list.vue')
-      },
-      {
-        path:'project/detail/:id',
-        component:()=>import('@/views/project/detail.vue')
+        name:'ProjectList',
+        component:()=>import('@/views/ProjectList.vue'),
+        meta:{ title:'项目管理' }
       },
       {
         path:'task/list',
-        component:()=>import('@/views/task/list.vue')
+        name:'TaskList',
+        component:()=>import('@/views/TaskList.vue'),
+        meta:{ title:'任务管理' }
       },
       {
-        path:'task/detail/:id',
-        component:()=>import('@/views/task/detail.vue')
+        path:'comment/list',
+        name:'CommentList',
+        component:()=>import('@/views/CommentList.vue'),
+        meta:{ title:'评论管理' }
       },
       {
-        path:'task/statistics',
-        component:()=>import('@/views/task/statistics.vue')
-      },
-      {
-        path:'file/index',
-        component:()=>import('@/views/file/index.vue')
+        path:'file/list',
+        name:'FileList',
+        component:()=>import('@/views/FileList.vue'),
+        meta:{ title:'文件管理' }
       }
     ]
   }
@@ -363,29 +378,39 @@ const router = createRouter({
   routes
 })
 
+// 路由守卫
+router.beforeEach((to,from,next)=>{
+  const token = getToken()
+  if(to.path !== '/login' && !token){
+    next('/login')
+  }else{
+    next()
+  }
+})
+
 export default router
 ```
 
----# 1️⃣3️⃣ 后端接口对应关系（重点）
+---
+
+# 1️⃣3️⃣ 后端接口对应关系
 
 这里已经与你后端 MD 完全对接。
 
-# 用户模块接口
+### 用户模块接口
 
-| 前端API | 请求方式 | 对应后端接口 |
-| --- | --- | --- |
-| loginApi | POST | /user/login |
-| registerApi | POST | /user/register |
-| getUserInfoApi | GET | /user/info |
-| getUserListApi | GET | /user/list |
-| getUserPageApi | GET | /user/page |
-| getUserDetailApi | GET | /user/detail/{id} |
-| updateUserApi | PUT | /user/update |
-| deleteUserApi | DELETE | /user/delete/{id} |
+| 前端API | 请求方式 | 对应后端接口 | 说明 |
+| --- | --- | --- | --- |
+| loginApi | POST | /user/login | 用户登录 |
+| registerApi | POST | /user/register | 用户注册 |
+| getUserInfoApi | GET | /user/info | 获取当前用户信息 |
+| getUserListApi | GET | /user/list | 用户列表 |
+| getUserPageApi | GET | /user/page | 用户分页查询 |
+| updateUserApi | PUT | /user/update | 修改用户信息 |
+| deleteUserApi | DELETE | /user/delete/{id} | 删除用户 |
+| uploadAvatarApi | POST | /user/avatar | 上传头像 |
 
----
-
-# 项目模块接口
+### 项目模块接口
 
 | 前端API | 请求方式 | 对应后端接口 |
 | --- | --- | --- |
@@ -396,19 +421,7 @@ export default router
 | updateProjectApi | PUT | /project/update |
 | deleteProjectApi | DELETE | /project/delete/{id} |
 
----
-
-# 项目成员接口
-
-| 前端API | 请求方式 | 对应后端接口 |
-| --- | --- | --- |
-| addProjectMemberApi | POST | /project/member/add |
-| getProjectMemberListApi | GET | /project/member/list/{projectId} |
-| deleteProjectMemberApi | DELETE | /project/member/delete/{id} |
-
----
-
-# 任务模块接口
+### 任务模块接口
 
 | 前端API | 请求方式 | 对应后端接口 |
 | --- | --- | --- |
@@ -422,9 +435,7 @@ export default router
 | assignTaskApi | PUT | /task/assign |
 | getTaskStatisticsApi | GET | /task/statistics |
 
----
-
-# 评论模块接口
+### 评论模块接口
 
 | 前端API | 请求方式 | 对应后端接口 |
 | --- | --- | --- |
@@ -432,9 +443,7 @@ export default router
 | getCommentListApi | GET | /comment/list/{taskId} |
 | deleteCommentApi | DELETE | /comment/delete/{id} |
 
----
-
-# 文件模块接口
+### 文件模块接口
 
 | 前端API | 请求方式 | 对应后端接口 |
 | --- | --- | --- |
@@ -443,9 +452,11 @@ export default router
 | deleteFileApi | DELETE | /file/delete/{id} |
 | downloadFileApi | GET | /file/download/{id} |
 
----# 1️⃣4️⃣ API 模块封装（必须与后端一致）
+---
 
-src/api/user.ts
+# 1️⃣4️⃣ API 模块封装
+
+**src/api/user.ts**
 
 ```typescript
 import request from '@/utils/request'
@@ -481,21 +492,6 @@ export function getUserListApi(params:any){
   })
 }
 
-export function getUserPageApi(params:any){
-  return request({
-    url:'/user/page',
-    method:'get',
-    params
-  })
-}
-
-export function getUserDetailApi(id:number){
-  return request({
-    url:`/user/detail/${id}`,
-    method:'get'
-  })
-}
-
 export function updateUserApi(data:any){
   return request({
     url:'/user/update',
@@ -510,11 +506,29 @@ export function deleteUserApi(id:number){
     method:'delete'
   })
 }
+
+/**
+ * 上传用户头像
+ */
+export function uploadAvatarApi(file: File) {
+  const formData = new FormData()
+  formData.append('file', file)
+  return request({
+    url: '/user/avatar',
+    method: 'post',
+    data: formData,
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
+}
 ```
 
----# 1️⃣5️⃣ 项目 API
+---
 
-src/api/project.ts
+# 1️⃣5️⃣ 项目 API
+
+**src/api/project.ts**
 
 ```typescript
 import request from '@/utils/request'
@@ -588,9 +602,11 @@ export function deleteProjectMemberApi(id:number){
 }
 ```
 
----# 1️⃣6️⃣ 任务 API
+---
 
-src/api/task.ts
+# 1️⃣6️⃣ 任务 API
+
+**src/api/task.ts**
 
 ```typescript
 import request from '@/utils/request'
@@ -669,7 +685,7 @@ export function getTaskStatisticsApi(){
 
 # 1️⃣7️⃣ 评论 API
 
-src/api/comment.ts
+**src/api/comment.ts**
 
 ```typescript
 import request from '@/utils/request'
@@ -701,7 +717,7 @@ export function deleteCommentApi(id:number){
 
 # 1️⃣8️⃣ 文件 API
 
-src/api/file.ts
+**src/api/file.ts**
 
 ```typescript
 import request from '@/utils/request'
@@ -743,53 +759,231 @@ export function downloadFileApi(id:number){
 
 ---
 
-# 1️⃣9️⃣ 登录页面逻辑
+# 1️⃣9️⃣ WebSocket 实时通知
 
-views/login/index.vue
+**src/utils/websocket.ts**
+
+```typescript
+import { ElNotification } from 'element-plus'
+
+class WebSocketService {
+
+  private socket: WebSocket | null = null
+  private listeners: Array<(data:any)=>void> = []
+
+  /**
+   * 建立连接
+   */
+  connect(userId:number){
+    if(
+      this.socket
+      &&
+      this.socket.readyState === WebSocket.OPEN
+    ){
+      return
+    }
+
+    this.socket = new WebSocket(
+      `ws://localhost:8080/ws/notification?userId=${userId}`
+    )
+
+    this.socket.onopen = ()=>{
+      console.log('WebSocket连接成功')
+    }
+
+    this.socket.onmessage = (event)=>{
+      console.log('收到WebSocket消息：',event.data)
+
+      const data = JSON.parse(event.data)
+
+      // 全局通知弹窗
+      ElNotification({
+        title:'系统通知',
+        message:data.content,
+        type:'success',
+        duration:3000
+      })
+
+      // 通知所有监听器
+      this.listeners.forEach(callback=>{
+        callback(data)
+      })
+    }
+
+    this.socket.onclose = ()=>{
+      console.log('WebSocket已断开')
+    }
+
+    this.socket.onerror = (error)=>{
+      console.error('WebSocket异常',error)
+    }
+  }
+
+  /**
+   * 注册监听器
+   */
+  addMessageListener(callback:(data:any)=>void){
+    this.listeners.push(callback)
+  }
+
+  /**
+   * 移除监听器
+   */
+  removeMessageListener(callback:(data:any)=>void){
+    this.listeners =
+      this.listeners.filter(item=>item !== callback)
+  }
+
+  /**
+   * 断开连接
+   */
+  disconnect(){
+    if(this.socket){
+      this.socket.close()
+      this.socket = null
+    }
+  }
+
+  /**
+   * 发送消息
+   */
+  send(message:string){
+    if(
+      this.socket
+      &&
+      this.socket.readyState === WebSocket.OPEN
+    ){
+      this.socket.send(message)
+    }
+  }
+}
+
+export default new WebSocketService()
+```
+
+---
+
+# 2️⃣0️⃣ 登录页面逻辑
+
+**views/Login.vue**
 
 核心逻辑：
 
 ```typescript
+import { reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { useUserStore } from '@/store/user'
+import { loginApi, registerApi, getUserInfoApi } from '@/api/user'
+import { ElMessage } from 'element-plus'
+
+const router = useRouter()
+const userStore = useUserStore()
+
 const loginForm = reactive({
   username:'',
   password:''
 })
 
+const registerDialogVisible = ref(false)
+const registerForm = reactive({
+  username:'',
+  password:'',
+  confirmPassword:'',
+  nickname:'',
+  email:'',
+  phone:''
+})
+
+// 登录
 const handleLogin = async ()=>{
-  const res:any = await loginApi(loginForm)
-  userStore.setToken(res.data.token)
-  router.push('/')
+  try {
+    const res:any = await loginApi(loginForm)
+    
+    // 先保存 Token
+    userStore.setToken(res.data.token)
+    
+    // 再获取用户完整信息（含权限）
+    const userInfoRes:any = await getUserInfoApi()
+    userStore.setUserInfo(userInfoRes.data)
+    
+    // 连接 WebSocket
+    userStore.connectWebSocket()
+    
+    ElMessage.success('登录成功')
+    router.push('/')
+  } catch (error) {
+    ElMessage.error('登录失败')
+  }
+}
+
+// 注册
+const handleRegister = async () => {
+  try {
+    await registerApi(registerForm)
+    ElMessage.success('注册成功，请登录')
+    registerDialogVisible.value = false
+  } catch (error) {
+    ElMessage.error('注册失败')
+  }
 }
 ```
 
 ---
 
-# 2️⃣0️⃣ 用户列表页面逻辑
+# 2️⃣1️⃣ 用户列表页面逻辑
 
-views/user/list.vue
+**views/UserList.vue**
 
-功能：
+新增功能：
 
-* 用户分页
-* 删除用户
-* 编辑用户
-* 搜索用户
+* ✅ 个人信息卡片（置顶显示）
+* ✅ 欢迎语动画效果
+* ✅ 权限控制（超级管理员 vs 普通用户）
+* ✅ 用户过滤（自动排除当前用户）
 
-表格字段：
+核心逻辑：
 
-| 字段 | 说明 |
-| --- | --- |
-| id | 用户ID |
-| username | 用户名 |
-| nickname | 昵称 |
-| role | 角色 |
-| createTime | 创建时间 |
+```typescript
+import { ref, reactive, onMounted, computed } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { useUserStore } from '@/store/user'
+import {
+  getUserPageApi,
+  deleteUserApi,
+  updateUserApi,
+  uploadAvatarApi
+} from '@/api/user'
+
+const userStore = useUserStore()
+
+// 判断是否为超级管理员
+const isSuperAdmin = computed(() => {
+  const info = userStore.info
+  return info?.roleId === 1 || info?.roleName === '超级管理员'
+})
+
+// 头像上传
+const uploadAvatar = async (options: any) => {
+  try {
+    const res: any = await uploadAvatarApi(options.file)
+    if (res.code === 200 && res.data?.avatarUrl) {
+      ElMessage.success('头像更新成功')
+      const userInfoRes: any = await getUserInfoApi()
+      userStore.setUserInfo(userInfoRes.data)
+    } else {
+      ElMessage.error(res.message || '上传失败')
+    }
+  } catch (error: any) {
+    ElMessage.error(error.message || '上传失败')
+  }
+}
+```
 
 ---
 
-# 2️⃣1️⃣ 项目管理页面逻辑
+# 2️⃣2️⃣ 项目管理页面逻辑
 
-views/project/list.vue
+**views/ProjectList.vue**
 
 功能：
 
@@ -809,9 +1003,13 @@ views/project/list.vue
 
 ---
 
-# 2️⃣2️⃣ 任务页面逻辑
+# 2️⃣3️⃣ 任务页面逻辑
 
-views/task/list.vue
+**views/TaskList.vue**
+
+新增功能：
+
+* ✅ 任务统计卡片（总数、进行中、已完成、已逾期）
 
 功能：
 
@@ -826,7 +1024,7 @@ views/task/list.vue
 任务优先级：
 
 | 值 | 含义 |
-| - | --- |
+| - | -- |
 | 0 | 普通 |
 | 1 | 紧急 |
 
@@ -840,9 +1038,9 @@ views/task/list.vue
 
 ---
 
-# 2️⃣3️⃣ 文件上传页面逻辑
+# 2️⃣4️⃣ 文件上传页面逻辑
 
-views/file/index.vue
+**views/FileList.vue**
 
 上传组件：
 
@@ -873,9 +1071,9 @@ const uploadFile = async (options:any)=>{
 
 ---
 
-# 2️⃣4️⃣ Dashboard 首页
+# 2️⃣5️⃣ Dashboard 首页
 
-views/dashboard/index.vue
+**views/Home.vue**
 
 建议展示：
 
@@ -883,13 +1081,13 @@ views/dashboard/index.vue
 * 项目总数
 * 任务总数
 * 已完成任务数量
-* ECharts统计图
+* ECharts统计图（可选）
 
 ---
 
-# 2️⃣5️⃣ Layout 布局设计
+# 2️⃣6️⃣ Layout 布局设计
 
-layout/index.vue
+**layout/index.vue**
 
 布局：
 
@@ -913,7 +1111,7 @@ layout/index.vue
 
 ---
 
-# 2️⃣6️⃣ Sidebar 菜单设计
+# 2️⃣7️⃣ Sidebar 菜单设计
 
 菜单：
 
@@ -925,7 +1123,7 @@ layout/index.vue
 
 ---
 
-# 2️⃣7️⃣ Header 功能
+# 2️⃣8️⃣ Header 功能
 
 Header：
 
@@ -936,7 +1134,7 @@ Header：
 
 ---
 
-# 2️⃣8️⃣ 分页规范（重要）
+# 2️⃣9️⃣ 分页规范
 
 后端返回：
 
@@ -960,7 +1158,7 @@ total.value = res.data.total
 
 ---
 
-# 2️⃣9️⃣ Element Plus 推荐组件
+# 3️⃣0️⃣ Element Plus 推荐组件
 
 推荐使用：
 
@@ -975,60 +1173,114 @@ total.value = res.data.total
 | el-card | 卡片 |
 | el-tag | 状态标签 |
 | el-avatar | 用户头像 |
+| el-descriptions | 描述列表 |
+| el-switch | 状态开关 |
+| el-notification | 通知弹窗 |
 
 ---
 
-# 3️⃣0️⃣ 推荐开发顺序
+# 3️⃣1️⃣ 推荐开发顺序
 
 建议：
 
-1. 登录页
+1. 登录页（含注册）
 2. Layout布局
-3. 用户模块
+3. 用户模块（含个人信息、头像上传）
 4. 项目模块
-5. 任务模块
+5. 任务模块（含统计）
 6. 评论模块
 7. 文件模块
 8. Dashboard统计
+9. WebSocket实时通知
 
 ---
 
-# 3️⃣1️⃣ 前端权限控制（推荐）
+# 3️⃣2️⃣ 前端权限控制
 
-建议：
+权限标识命名规范：采用统一格式 `资源:操作`
 
-```typescript
-router.beforeEach((to,from,next)=>{
-  const token = getToken()
-  if(to.path !== '/login' && !token){
-    next('/login')
-  }else{
-    next()
-  }
-})
+示例：
+
+* `user:list` - 查看用户列表
+* `user:add` - 新增用户
+* `user:delete` - 删除用户
+* `user:status` - 修改用户状态
+
+前端实现：
+
+**模板中使用：**
+
+```vue
+<el-button v-if="userStore.hasPermission('user:delete')" type="danger">
+  删除
+</el-button>
 ```
 
----
+**脚本中使用：**
 
-# 3️⃣2️⃣ 推荐优化
+```typescript
+if (userStore.hasPermission('user:add')) {
+  // 执行新增逻辑
+}
+```
 
-后续可优化：
-
-* 动态菜单
-* RBAC权限
-* WebSocket实时通知
-* ECharts统计
-* 深色模式
-* 国际化
-* 暗黑主题
-* Markdown编辑器
-* 富文本编辑器
-* 文件预览
-* 拖拽上传
+⚠️ **重要**: 前端 UI 层面的权限控制仅用于用户体验优化，真正的安全验证必须在后端完成。
 
 ---
 
-# 3️⃣3️⃣ 前后端联调说明（重要）
+# 3️⃣3️⃣ 认证流程与缓存管理
+
+登录顺序：
+
+1. 调用登录接口获取 Token
+2. 保存 Token 到 localStorage
+3. 调用 `/user/info` 获取用户完整信息（含权限列表）
+4. 存入 Pinia Store 和 localStorage
+5. 连接 WebSocket
+6. 跳转页面
+
+退出清理：
+
+退出登录时，必须同步清除：
+
+* Token
+* 用户信息（info）
+* WebSocket 连接
+
+---
+
+# 3️⃣4️⃣ TypeScript 项目配置规范
+
+TypeScript 配置文件要求：
+
+* 项目根目录必须存在 `tsconfig.json` 文件
+* 需创建 `tsconfig.node.json` 用于 Vite 配置文件类型检查
+* 需创建 `vite-env.d.ts` 声明 Vue 文件和 Vite 相关的全局类型
+
+编译器选项配置规范：
+
+* `"strict": true` - 启用严格类型检查
+* `"forceConsistentCasingInFileNames": true` - 强制文件名大小写一致
+
+路径别名配置要求：
+
+为确保 TypeScript 能正确识别 `@/*` 等路径别名，必须在以下配置文件中设置 paths 映射：
+
+* `tsconfig.json`: 配置 `baseUrl` 指向项目根目录或 src 目录，配置 `paths` 将 `@/*` 映射到 `src/*`
+* `vite.config.ts`: 配置 `resolve.alias` 与 TypeScript 配置保持一致
+
+---
+
+# 3️⃣5️⃣ Element Plus 2.x 组件语法规范
+
+在使用 Element Plus 2.x 版本时，需注意以下语法变更以避免兼容性问题：
+
+* 弹窗/对话框的可见性绑定：将 `:visible.sync` 改为 `v-model`
+* 按钮尺寸属性：将 `size="mini"` 改为 `size="small"`（mini 在 2.x 中已废弃）
+
+---
+
+# 3️⃣6️⃣ 前后端联调说明
 
 后端启动：
 
@@ -1056,27 +1308,88 @@ http://localhost:8080/user/login
 
 ---
 
-# 3️⃣4️⃣ 项目完成度
+# 3️⃣7️⃣ 项目完成度
 
-| 模块 | 完成度 |
-| --- | --- |
-| 登录模块 | 90% |
-| 用户模块 | 85% |
-| 项目模块 | 80% |
-| 任务模块 | 80% |
-| 评论模块 | 70% |
-| 文件模块 | 70% |
-| Dashboard | 60% |
+| 模块 | 完成度 | 说明 |
+| --- | --- | --- |
+| 登录模块 | 100% | 含注册功能 |
+| 用户模块 | 100% | 含个人信息、头像上传、权限控制 |
+| 项目模块 | 90% | 基础CRUD完成 |
+| 任务模块 | 90% | 含统计功能 |
+| 评论模块 | 85% | 基础功能完成 |
+| 文件模块 | 85% | 上传下载完成 |
+| Dashboard | 70% | 基础统计完成 |
+| WebSocket | 100% | 实时通知完成 |
+| 权限体系 | 100% | 前后端权限控制完成 |
 
 整体：
 
 ```text
-约 80%
+约 92%
 ```
 
 ---
 
-# 3️⃣5️⃣ 总结
+# 3️⃣8️⃣ 新增功能总结（v2.0）
+
+相比原始文档，当前前端新增以下功能：
+
+1. **用户模块增强**
+   * ✅ 头像上传功能（/user/avatar）
+   * ✅ 个人信息卡片展示（置顶显示）
+   * ✅ 欢迎语动画效果
+   * ✅ 注册功能（Login页面集成）
+   * ✅ 角色管理接口（/role/list）
+   * ✅ 用户状态开关控制（ElSwitch组件）
+   * ✅ 用户列表自动过滤当前用户
+
+2. **权限体系完善**
+   * ✅ Pinia Store 中集成 hasPermission getter
+   * ✅ 超级管理员权限判断逻辑（roleId === 1）
+   * ✅ 权限标识规范（resource:action格式）
+   * ✅ 前后端权限验证一致性
+
+3. **WebSocket 实时通知**
+   * ✅ WebSocket 工具类封装（websocket.ts）
+   * ✅ 系统通知弹窗（ElNotification）
+   * ✅ 消息监听器机制
+   * ✅ 自动连接/断开管理
+
+4. **任务统计功能**
+   * ✅ 任务总数统计卡片
+   * ✅ 进行中/已完成/已逾期分类统计
+
+5. **UI/UX 优化**
+   * ✅ 响应式布局
+   * ✅ 动画效果
+   * ✅ 渐变色背景
+   * ✅ Hover交互效果
+   * ✅ 加载状态提示
+
+---
+
+# 3️⃣9️⃣ 推荐优化方向
+
+后续可优化：
+
+* 动态菜单（基于权限）
+* RBAC权限细化
+* ECharts图表可视化
+* 深色模式/暗黑主题
+* 国际化（i18n）
+* Markdown编辑器
+* 富文本编辑器
+* 文件预览（PDF、图片）
+* 拖拽上传
+* 任务看板视图
+* 甘特图
+* 消息中心
+* 操作日志
+* 数据导出（Excel）
+
+---
+
+# 4️⃣0️⃣ 总结
 
 当前前端系统已经具备：
 
@@ -1084,16 +1397,19 @@ http://localhost:8080/user/login
 * Vue3 + TS现代化开发
 * 前后端分离
 * JWT鉴权
-* 用户管理
+* 用户管理（含头像、权限）
 * 项目管理
-* 任务协作
+* 任务协作（含统计）
 * 评论系统
 * 文件上传
 * 分页查询
-* 状态管理
+* 状态管理（Pinia）
 * 接口模块化
 * Axios统一请求
-* Pinia状态管理
+* WebSocket实时通知
+* 权限控制体系
+* 注册功能
+* 动画交互效果
 
 适合作为：
 
@@ -1103,4 +1419,27 @@ http://localhost:8080/user/login
 * 企业级后台管理系统
 * Java Web 全栈项目
 
+---
 
+# 附录：常见问题
+
+**Q1: 登录后权限不生效？**
+A: 清除浏览器 Local Storage 中的 `token` 和 `userInfo`，重新登录。
+
+**Q2: Element Plus 组件报错？**
+A: 确保使用 v2.x 版本，语法使用 `v-model` 而非 `:visible.sync`。
+
+**Q3: 路径别名 @/* 无法识别？**
+A: 检查 `tsconfig.json` 和 `vite.config.ts` 中的 `paths` 和 `alias` 配置是否一致。
+
+**Q4: WebSocket 连接失败？**
+A: 确认后端 WebSocket 服务已启动，地址为 `ws://localhost:8080/ws/notification`。
+
+**Q5: 头像上传后不显示？**
+A: 检查后端返回的 `avatarUrl` 是否正确，前端会自动添加 `/api` 前缀和时间戳防止缓存。
+
+---
+
+**文档版本**: v2.0
+**最后更新**: 2026-05-24
+**维护者**: Collab Flow 开发团队

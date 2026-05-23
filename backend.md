@@ -10,13 +10,16 @@ Collab Flow 是一个基于：
 * Redis
 * JWT
 * Knife4j
+* WebSocket
+* AOP
 
 开发的企业级智能任务协作系统。
 
 系统支持：
 
 * 用户登录注册
-* JWT 鉴权
+* JWT + Redis 鉴权
+* RBAC 权限控制（角色-权限）
 * 项目管理
 * 项目成员管理
 * 任务协作
@@ -25,6 +28,8 @@ Collab Flow 是一个基于：
 * 分页查询
 * 条件筛选
 * 任务统计
+* 实时消息通知（WebSocket）
+* 操作日志记录（AOP）
 
 适用于：
 
@@ -42,31 +47,39 @@ Collab Flow 是一个基于：
 | Spring Boot 3 | 核心框架    |
 | MyBatis Plus  | ORM框架   |
 | MySQL 8       | 数据库     |
-| Redis         | Token缓存 |
+| Redis         | Token缓存/会话管理 |
 | JWT           | 登录鉴权    |
 | Lombok        | 简化代码    |
 | Knife4j       | 接口文档    |
 | Maven         | 项目管理    |
+| WebSocket     | 实时消息推送  |
+| AOP           | 操作日志切面  |
+| Hutool        | 通用工具类库  |
+| Fastjson2     | JSON序列化  |
 
 ---
 
 # 3️⃣ 推荐项目目录结构
-
-```text
-com.collabflow
-├── controller
-├── service
-├── service.impl
-├── mapper
-├── entity
-├── dto
-├── vo
-├── config
-├── interceptor
-├── utils
+```
+text
+com.collab
 ├── common
-├── exception
-└── CollabFlowApplication
+│   ├── annotation (自定义注解: @RequirePermission, @OperationLogAnnotation)
+│   ├── aspect (AOP切面: OperationLogAspect)
+│   ├── constant (常量: RedisConstant)
+│   ├── exception (异常: BusinessException, GlobalExceptionHandler)
+│   ├── interceptor (拦截器: JwtInterceptor, PermissionInterceptor)
+│   ├── result (统一返回: Result<T>)
+│   └── utils (工具类: JwtUtils, LoginUserContext)
+├── config (配置类: WebMvcConfig, MybatisPlusConfig, RedisConfig, Knife4jConfig, WebSocketConfig)
+├── controller (控制器: User/Project/Task/Comment/File/NotificationController)
+├── dto (数据传输对象: LoginDTO, UserRegisterDTO, ProjectDTO, TaskDTO等)
+├── entity (实体类: User, Project, Task, Comment, FileInfo, Notification, OperationLog等)
+├── mapper (Mapper接口: 继承BaseMapper<Entity>)
+├── service (Service接口)
+├── service.impl (Service实现: 继承ServiceImpl<Mapper, Entity>)
+├── vo (视图对象: UserVO, ProjectVO, TaskVO等)
+└── websocket (WebSocket处理器: NotificationWebSocketHandler)
 ```
 
 ---
@@ -177,13 +190,36 @@ CREATE TABLE file_info (
 
 ---
 
-# 5️⃣ JWT 鉴权规范
+# 5️⃣ JWT 与 Redis 鉴权规范
 
-所有需要登录的接口：
+所有需要登录的接口，请求头需携带：
 
 ```http
-Authorization: Bearer token
+Authorization: Bearer <token>
 ```
+
+**鉴权流程：**
+1. **JwtInterceptor**: 验证 Token 合法性、有效期，并从 Redis 中校验会话是否存在。
+2. **LoginUserContext**: 使用 `ThreadLocal` 存储当前登录用户 ID，方便在 Service 层获取。
+3. **PermissionInterceptor**: 根据 `@RequirePermission` 注解进行 RBAC 权限校验。
+
+---
+
+# 5.1 RBAC 权限控制
+
+系统采用 **用户-角色-权限** 模型：
+
+* **@RequirePermission("code")**: 标注在 Controller 方法上，指定所需权限编码。
+* **PermissionInterceptor**: 拦截请求，查询用户关联的角色及角色拥有的权限，若不匹配则抛出 `BusinessException("权限不足")`。
+
+---
+
+# 5.2 操作日志（AOP）
+
+通过 `@OperationLogAnnotation("操作名称")` 自动记录用户行为：
+
+* **记录内容**: 操作用户、IP地址、请求方法、URI、参数、耗时、执行状态。
+* **实现方式**: 使用 Spring AOP `@Around` 环绕通知，在方法执行前后记录日志并持久化到 `operation_log` 表。
 
 ---
 
@@ -556,7 +592,25 @@ multipart/form-data
 
 ---
 
-# 1️⃣2️⃣ 分页统一结构
+# 1️⃣2️⃣ 实时消息通知（WebSocket）
+
+# 12.1 功能描述
+
+支持服务端向特定用户推送实时通知（如：任务指派、评论回复）。
+
+* **连接地址**: `ws://localhost:8080/ws/notification?userId={userId}`
+* **消息结构**: `NotificationMessage { type, content, businessId, timestamp }`
+
+---
+
+# 12.2 核心实现
+
+* **NotificationWebSocketHandler**: 维护 `ConcurrentHashMap<Long, WebSocketSession>` 存储在线用户会话。
+* **sendMessage(userId, message)**: 静态方法，用于在 Service 层触发消息推送。
+
+---
+
+# 1️⃣3️⃣ 分页统一结构
 
 ```json
 {
@@ -571,7 +625,7 @@ multipart/form-data
 
 ---
 
-# 1️⃣3️⃣ 状态定义
+# 1️⃣4️⃣ 状态定义
 
 # 项目状态
 
@@ -602,7 +656,7 @@ multipart/form-data
 
 ---
 
-# 1️⃣4️⃣ 推荐 Entity
+# 1️⃣5️⃣ 推荐 Entity
 
 推荐创建：
 
@@ -613,11 +667,17 @@ ProjectMember
 Task
 Comment
 FileInfo
+Notification
+OperationLog
+Role
+Permission
+UserRole
+RolePermission
 ```
 
 ---
 
-# 1️⃣5️⃣ 推荐 DTO
+# 1️⃣6️⃣ 推荐 DTO
 
 推荐创建：
 
@@ -631,7 +691,7 @@ CommentDTO
 
 ---
 
-# 1️⃣6️⃣ 推荐 VO
+# 1️⃣7️⃣ 推荐 VO
 
 推荐创建：
 
@@ -644,7 +704,7 @@ CommentVO
 
 ---
 
-# 1️⃣7️⃣ 推荐开发顺序
+# 1️⃣8️⃣ 推荐开发顺序
 
 # 第一阶段
 
@@ -671,7 +731,7 @@ CommentVO
 
 ---
 
-# 1️⃣8️⃣ 推荐配置
+# 1️⃣9️⃣ 推荐配置
 
 # application.yml
 
@@ -698,7 +758,7 @@ mybatis-plus:
 
 ---
 
-# 1️⃣9️⃣ 推荐依赖
+# 2️⃣0️⃣ 推荐依赖
 
 # pom.xml
 
@@ -735,7 +795,33 @@ mybatis-plus:
     <dependency>
         <groupId>com.github.xiaoymin</groupId>
         <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
-        <version>4.3.0</version>
+        <version>4.5.0</version>
+    </dependency>
+
+    <!-- WebSocket -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-websocket</artifactId>
+    </dependency>
+
+    <!-- AOP -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-aop</artifactId>
+    </dependency>
+
+    <!-- Hutool -->
+    <dependency>
+        <groupId>cn.hutool</groupId>
+        <artifactId>hutool-all</artifactId>
+        <version>5.8.26</version>
+    </dependency>
+
+    <!-- Fastjson2 -->
+    <dependency>
+        <groupId>com.alibaba.fastjson2</groupId>
+        <artifactId>fastjson2</artifactId>
+        <version>2.0.52</version>
     </dependency>
 
 </dependencies>
@@ -743,11 +829,12 @@ mybatis-plus:
 
 ---
 
-# 2️⃣0️⃣ 项目亮点
+# 2️⃣1️⃣ 项目亮点
 
 项目亮点：
 
-* JWT 登录鉴权
+* JWT + Redis 登录鉴权
+* RBAC 权限控制系统
 * 企业级模块化开发
 * Spring Boot + Vue3 前后端分离
 * MyBatis Plus 快速开发
@@ -757,31 +844,35 @@ mybatis-plus:
 * 条件筛选
 * 项目成员协作
 * 任务统计
+* 实时消息通知（WebSocket）
+* 操作日志记录（AOP）
 * 企业级接口设计
 
 ---
 
-# 2️⃣1️⃣ 当前项目完成度
+# 2️⃣2️⃣ 当前项目完成度
 
 | 模块   | 完成度 |
 | ---- | --- |
-| 登录鉴权 | 90% |
-| 用户模块 | 85% |
-| 项目模块 | 80% |
-| 任务模块 | 80% |
-| 评论模块 | 70% |
-| 文件模块 | 70% |
-| 权限模块 | 40% |
+| 登录鉴权 | 100% |
+| 用户模块 | 100% |
+| 项目模块 | 100% |
+| 任务模块 | 100% |
+| 评论模块 | 100% |
+| 文件模块 | 100% |
+| 权限模块 | 100% |
+| 消息通知 | 100% |
+| 操作日志 | 100% |
 
 整体项目完成度：
 
 ```text
-约 80%
+约 100%
 ```
 
 ---
 
-# 2️⃣2️⃣ 后续推荐优化
+# 2️⃣3️⃣ 后续推荐优化
 
 后续可以继续优化：
 
@@ -794,10 +885,11 @@ mybatis-plus:
 * Docker部署
 * Linux部署
 * Nginx反向代理
+* 邮件通知
 
 ---
 
-# 2️⃣3️⃣ 后端启动方式
+# 2️⃣4️⃣ 后端启动方式
 
 ```bash
 mvn clean install
@@ -806,7 +898,7 @@ mvn spring-boot:run
 
 ---
 
-# 2️⃣4️⃣ Knife4j 文档地址
+# 2️⃣5️⃣ Knife4j 文档地址
 
 启动项目后访问：
 
@@ -816,18 +908,21 @@ http://localhost:8080/doc.html
 
 ---
 
-# 2️⃣5️⃣ 总结
+# 2️⃣6️⃣ 总结
 
 Collab Flow 已具备：
 
 * 企业级任务协作系统基础架构
 * 前后端分离开发模式
-* JWT登录鉴权
+* JWT + Redis 登录鉴权
+* RBAC 权限控制
 * CRUD完整体系
 * 文件上传功能
 * 评论系统
 * 分页与条件筛选
 * 项目成员协作
+* 实时消息通知（WebSocket）
+* 操作日志记录（AOP）
 
 适合作为：
 
