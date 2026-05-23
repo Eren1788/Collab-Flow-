@@ -12,9 +12,22 @@
         <el-button type="primary" @click="loadUserList">
           搜索
         </el-button>
+        <!-- 优化后的欢迎语区域 -->
         <div class="welcome-info">
-          <el-icon><User /></el-icon>
-          <span>欢迎使用 Collab Flow 智能任务协作系统，当前用户：{{ currentUserDisplay }} ({{ currentUserRole }})</span>
+          <div class="welcome-icons">
+            <el-icon class="icon-smile"><Sunny /></el-icon>
+            <el-icon class="icon-gift"><Present /></el-icon>
+          </div>
+          <div class="welcome-text">
+            <span>欢迎使用 Collab Flow</span>
+            <span class="user-badge">
+              <el-icon><User /></el-icon>
+              {{ currentUserDisplay }} ({{ currentUserRole }})
+            </span>
+          </div>
+          <div class="welcome-icons">
+            <el-icon class="icon-star"><Star /></el-icon>
+          </div>
         </div>
       </div>
     </el-card>
@@ -27,13 +40,27 @@
           <el-button type="primary" size="small" @click="openEditDialog(myInfo)">编辑我的信息</el-button>
         </div>
       </template>
-      <el-descriptions :column="2" border>
-        <el-descriptions-item label="用户名">{{ myInfo.username }}</el-descriptions-item>
-        <el-descriptions-item label="昵称">{{ myInfo.nickname || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="职位">{{ myInfo.roleName || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="邮箱">{{ myInfo.email || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="手机号">{{ myInfo.phone || '-' }}</el-descriptions-item>
-      </el-descriptions>
+      <div class="avatar-section">
+        <el-upload
+          class="avatar-uploader"
+          :show-file-list="false"
+          :before-upload="beforeAvatarUpload"
+          :http-request="uploadAvatar"
+          accept="image/png, image/jpeg, image/jpg"
+        >
+          <el-avatar :size="80" :src="avatarUrl" class="user-avatar">
+            <el-icon><User /></el-icon>
+          </el-avatar>
+          <div class="avatar-tip">点击更换头像</div>
+        </el-upload>
+        <el-descriptions :column="2" border class="user-info-desc">
+          <el-descriptions-item label="用户名">{{ myInfo.username }}</el-descriptions-item>
+          <el-descriptions-item label="昵称">{{ myInfo.nickname || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="职位">{{ myInfo.roleName || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="邮箱">{{ myInfo.email || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="手机号">{{ myInfo.phone || '-' }}</el-descriptions-item>
+        </el-descriptions>
+      </div>
     </el-card>
 
     <!-- 员工列表标题 -->
@@ -53,49 +80,29 @@
         <el-table-column prop="nickname" label="昵称" />
         <el-table-column prop="roleName" label="职位">
           <template #default="scope">
-            <el-tag type="warning">
-              {{ scope.row.roleName || '暂无职位' }}
-            </el-tag>
+            <el-tag type="warning">{{ scope.row.roleName || '暂无职位' }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="email" label="邮箱" />
         <el-table-column prop="phone" label="手机号" />
 
-        <!-- 状态列：仅超级管理员可见 -->
         <el-table-column v-if="isSuperAdmin" label="状态" width="140">
           <template #default="scope">
             <div style="display: flex; align-items: center; gap: 10px">
               <span>{{ scope.row.status === 1 ? '正常' : '禁用' }}</span>
-              <el-switch
-                :model-value="scope.row.status === 1"
-                @change="changeStatus(scope.row)"
-              />
+              <el-switch :model-value="scope.row.status === 1" @change="changeStatus(scope.row)" />
             </div>
           </template>
         </el-table-column>
 
-        <!-- 操作列：仅超级管理员可见（修改点：添加 v-if="isSuperAdmin"） -->
         <el-table-column label="操作" width="220" v-if="isSuperAdmin">
           <template #default="scope">
-            <el-button
-              type="primary"
-              size="small"
-              @click="openEditDialog(scope.row)"
-            >
-              编辑
-            </el-button>
-            <el-button
-              type="danger"
-              size="small"
-              @click="handleDelete(scope.row.id)"
-            >
-              删除
-            </el-button>
+            <el-button type="primary" size="small" @click="openEditDialog(scope.row)">编辑</el-button>
+            <el-button type="danger" size="small" @click="handleDelete(scope.row.id)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
 
-      <!-- 分页 -->
       <el-pagination
         style="margin-top: 20px; text-align: right"
         :current-page="pageNum"
@@ -106,7 +113,7 @@
       />
     </el-card>
 
-    <!-- 编辑用户弹窗（复用） -->
+    <!-- 编辑用户弹窗 -->
     <el-dialog v-model="editDialogVisible" title="编辑用户" width="500px">
       <el-form :model="editForm" label-width="80px">
         <el-form-item label="用户名">
@@ -122,17 +129,8 @@
           <el-input v-model="editForm.phone" />
         </el-form-item>
         <el-form-item label="职位" v-if="isSuperAdmin">
-          <el-select
-            v-model="editForm.roleId"
-            placeholder="请选择职位"
-            style="width: 100%"
-          >
-            <el-option
-              v-for="item in roleList"
-              :key="item.id"
-              :label="item.roleName"
-              :value="item.id"
-            />
+          <el-select v-model="editForm.roleId" placeholder="请选择职位" style="width: 100%">
+            <el-option v-for="item in roleList" :key="item.id" :label="item.roleName" :value="item.id" />
           </el-select>
         </el-form-item>
         <div v-if="!isSuperAdmin" style="color: #909399; font-size: 12px; margin-top: -10px; margin-bottom: 10px;">
@@ -150,19 +148,25 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { User } from '@element-plus/icons-vue'
-import { getUserPageApi, deleteUserApi, updateUserApi, updateUserStatusApi, getRoleListApi, getUserInfoApi } from '../api/user'
+import { User, Sunny, Present, Star } from '@element-plus/icons-vue'  // 新增图标
+import {
+  getUserPageApi,
+  deleteUserApi,
+  updateUserApi,
+  updateUserStatusApi,
+  getRoleListApi,
+  getUserInfoApi,
+  uploadAvatarApi
+} from '../api/user'
 import { useUserStore } from '../store/user'
 
 const userStore = useUserStore()
 
-// 判断当前登录用户是否是超级管理员
 const isSuperAdmin = computed(() => {
   const info = userStore.info
   return info?.roleId === 1 || info?.roleName === '超级管理员'
 })
 
-// 当前用户显示名称
 const currentUserDisplay = computed(() => {
   const info = userStore.info
   if (info?.nickname) return info.nickname
@@ -170,34 +174,29 @@ const currentUserDisplay = computed(() => {
   return '未知用户'
 })
 
-// 当前用户角色
 const currentUserRole = computed(() => {
   const info = userStore.info
   if (info?.roleName) return info.roleName
   return '用户'
 })
 
-// 当前用户个人信息（用于顶部卡片）
 const myInfo = computed(() => userStore.info)
 
-// 搜索表单
+const avatarUrl = computed(() => {
+  const avatar = userStore.info?.avatar
+  if (avatar && avatar.startsWith('/uploads')) {
+    return `/api${avatar}?t=${Date.now()}`
+  }
+  return ''
+})
+
 const searchForm = reactive({ username: '' })
-
-// 用户列表（原始数据，包含自己）
 const userList = ref<any[]>([])
-
-// 角色列表
 const roleList = ref<any[]>([])
-
-// 分页参数
 const pageNum = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
-
-// 弹窗控制
 const editDialogVisible = ref(false)
-
-// 编辑表单
 const editForm = reactive({
   id: null as number | null,
   username: '',
@@ -208,14 +207,12 @@ const editForm = reactive({
   status: null as number | null
 })
 
-// 过滤掉当前登录用户后的列表
 const filteredUserList = computed(() => {
   const currentUserId = userStore.info?.id
   if (!currentUserId) return userList.value
   return userList.value.filter(user => user.id !== currentUserId)
 })
 
-// 获取用户列表
 const loadUserList = async () => {
   try {
     const res: any = await getUserPageApi({ pageNum: pageNum.value, pageSize: pageSize.value, keyword: searchForm.username })
@@ -226,10 +223,8 @@ const loadUserList = async () => {
   }
 }
 
-// 分页处理
 const handlePageChange = (newPage: number) => { pageNum.value = newPage; loadUserList() }
 
-// 获取角色列表
 const loadRoleList = async () => {
   try {
     const res: any = await getRoleListApi()
@@ -239,14 +234,12 @@ const loadRoleList = async () => {
   }
 }
 
-// 打开编辑弹窗
 const openEditDialog = (row: any) => {
   editForm.id = row.id
   editForm.username = row.username
   editForm.nickname = row.nickname || ''
   editForm.email = row.email || ''
   editForm.phone = row.phone || ''
-
   if (isSuperAdmin.value) {
     editForm.roleId = row.roleId || null
     editForm.status = row.status
@@ -257,15 +250,9 @@ const openEditDialog = (row: any) => {
   editDialogVisible.value = true
 }
 
-// 保存编辑
 const handleUpdateUser = async () => {
   try {
-    const updateData: any = {
-      id: editForm.id,
-      nickname: editForm.nickname,
-      email: editForm.email,
-      phone: editForm.phone
-    }
+    const updateData: any = { id: editForm.id, nickname: editForm.nickname, email: editForm.email, phone: editForm.phone }
     if (isSuperAdmin.value) {
       if (editForm.roleId !== null) updateData.roleId = editForm.roleId
       if (editForm.status !== null) updateData.status = editForm.status
@@ -273,9 +260,7 @@ const handleUpdateUser = async () => {
     await updateUserApi(updateData)
     ElMessage.success('修改成功')
     editDialogVisible.value = false
-    await loadUserList()  // 刷新列表
-
-    // 如果修改的是自己，同时更新 store 中的用户信息
+    await loadUserList()
     if (editForm.id === userStore.info.id) {
       const res: any = await getUserInfoApi()
       userStore.setUserInfo(res.data)
@@ -285,7 +270,6 @@ const handleUpdateUser = async () => {
   }
 }
 
-// 删除用户
 const handleDelete = async (id: number) => {
   try {
     await ElMessageBox.confirm('确定删除该用户吗？', '提示', { type: 'warning' })
@@ -295,7 +279,6 @@ const handleDelete = async (id: number) => {
   } catch {}
 }
 
-// 修改状态（仅超级管理员）
 const changeStatus = async (row: any) => {
   try {
     const newStatus = row.status === 1 ? 0 : 1
@@ -304,6 +287,35 @@ const changeStatus = async (row: any) => {
     ElMessage.success('状态修改成功')
   } catch {
     ElMessage.error('状态修改失败')
+  }
+}
+
+const beforeAvatarUpload = (file: File) => {
+  const isImage = file.type.startsWith('image/')
+  const isLt5M = file.size / 1024 / 1024 < 5
+  if (!isImage) {
+    ElMessage.error('只能上传图片文件')
+    return false
+  }
+  if (!isLt5M) {
+    ElMessage.error('头像大小不能超过5MB')
+    return false
+  }
+  return true
+}
+
+const uploadAvatar = async (options: any) => {
+  try {
+    const res: any = await uploadAvatarApi(options.file)
+    if (res.code === 200 && res.data?.avatarUrl) {
+      ElMessage.success('头像更新成功')
+      const userInfoRes: any = await getUserInfoApi()
+      userStore.setUserInfo(userInfoRes.data)
+    } else {
+      ElMessage.error(res.message || '上传失败')
+    }
+  } catch (error: any) {
+    ElMessage.error(error.message || '上传失败')
   }
 }
 
@@ -322,23 +334,89 @@ onMounted(() => {
   gap: 20px;
   flex-wrap: wrap;
 }
+
+/* 优化后的欢迎语样式 */
 .welcome-info {
-  margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 8px;
-  color: #409eff;
-  background-color: #ecf5ff;
-  padding: 0 12px;
-  height: 32px;
-  border-radius: 16px;
-  font-size: 14px;
+  gap: 12px;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e6f4ff 100%);
+  padding: 8px 20px;
+  border-radius: 40px;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.15);
+  border: 1px solid rgba(64, 158, 255, 0.2);
+  transition: all 0.3s;
 }
+.welcome-info:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.25);
+}
+.welcome-icons {
+  display: flex;
+  gap: 6px;
+}
+.icon-smile {
+  font-size: 22px;
+  color: #ffaa00;
+  animation: bounce 2s infinite;
+}
+.icon-gift {
+  font-size: 22px;
+  color: #ff6b6b;
+  animation: swing 2s infinite;
+}
+.icon-star {
+  font-size: 22px;
+  color: #ffc107;
+  animation: pulse 1.5s infinite;
+}
+.welcome-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.4;
+}
+.welcome-text span:first-child {
+  font-size: 14px;
+  font-weight: 500;
+  color: #409eff;
+  letter-spacing: 1px;
+}
+.user-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: white;
+  padding: 4px 12px;
+  border-radius: 30px;
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: bold;
+  color: #333;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.user-badge .el-icon {
+  color: #409eff;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+@keyframes swing {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(10deg); }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.1); }
+}
+
 .welcome-info .el-icon {
   font-size: 16px;
 }
 
-/* 我的信息卡片样式 */
+/* 其他样式保持不变 */
 .my-info-card {
   margin-bottom: 20px;
   border-left: 4px solid #409eff;
@@ -355,8 +433,31 @@ onMounted(() => {
   align-items: center;
   gap: 6px;
 }
-
-/* 员工列表标题样式 */
+.avatar-section {
+  display: flex;
+  align-items: flex-start;
+  gap: 30px;
+  flex-wrap: wrap;
+}
+.avatar-uploader {
+  cursor: pointer;
+  text-align: center;
+}
+.user-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #409eff;
+  transition: all 0.3s;
+}
+.user-avatar:hover { opacity: 0.8; }
+.avatar-tip {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 8px;
+}
+.user-info-desc { flex: 1; }
 .employee-list-title {
   margin: 8px 0 16px 0;
 }

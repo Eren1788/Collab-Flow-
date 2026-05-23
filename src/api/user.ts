@@ -94,3 +94,20 @@ export function getUserInfoApi() {
     method: 'get'
   })
 }
+
+/**
+ * 上传用户头像
+ * @param file 头像文件
+ */
+export function uploadAvatarApi(file: File) {
+  const formData = new FormData()
+  formData.append('file', file)
+  return request({
+    url: '/user/avatar',
+    method: 'post',
+    data: formData,
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
+}
