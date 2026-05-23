@@ -1,5 +1,10 @@
 package com.collab.service.impl;
 
+import org.springframework.beans.factory.annotation.Value;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -26,6 +31,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -287,6 +293,60 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     @Override
     public void deleteUser(Long id) {
         userMapper.deleteById(id);
+    }
+
+    @Value("${file.upload-path}")
+    private String uploadPath;
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public String uploadAvatar(MultipartFile file) {
+        Long userId = LoginUserContext.getUserId();
+        if (userId == null) {
+            throw new BusinessException("未登录");
+        }
+
+        // 校验文件类型
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            throw new BusinessException("只能上传图片文件");
+        }
+
+        // 限制文件大小（5MB）
+        if (file.getSize() > 5 * 1024 * 1024) {
+            throw new BusinessException("头像大小不能超过5MB");
+        }
+
+        try {
+            // 保存目录：uploadPath/avatar/
+            Path avatarDir = Paths.get(uploadPath, "avatar");
+            if (!Files.exists(avatarDir)) {
+                Files.createDirectories(avatarDir);
+            }
+
+            // 文件名：{userId}.png（统一转为png）
+            String fileName = userId + ".png";
+            Path targetPath = avatarDir.resolve(fileName);
+
+            // 保存文件（覆盖）
+            file.transferTo(targetPath.toFile());
+
+            // 生成访问URL：/uploads/avatar/{userId}.png
+            String avatarUrl = "/uploads/avatar/" + fileName;
+
+            // 更新 user 表的 avatar 字段
+            User user = userMapper.selectById(userId);
+            if (user != null) {
+                user.setAvatar(avatarUrl);
+                userMapper.updateById(user);
+            }
+
+            log.info("用户 {} 头像上传成功，路径: {}", userId, targetPath);
+            return avatarUrl;
+        } catch (IOException e) {
+            log.error("保存头像失败", e);
+            throw new BusinessException("头像上传失败：" + e.getMessage());
+        }
     }
 
     @Override

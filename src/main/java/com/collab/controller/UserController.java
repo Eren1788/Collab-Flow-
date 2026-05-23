@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
 
@@ -114,6 +115,17 @@ public class UserController {
         log.info("删除用户:{}",id);
         userService.deleteUser(id);
         return Result.success();
+    }
+
+    /**
+     * 上传用户头像（所有人可修改自己的头像）
+     */
+    @PostMapping("/avatar")
+    @Operation(summary = "上传用户头像", description = "上传当前登录用户的头像")
+    public Result<Map<String, String>> uploadAvatar(@RequestParam("file") MultipartFile file) {
+        log.info("上传用户头像");
+        String avatarUrl = userService.uploadAvatar(file);
+        return Result.success(Map.of("avatarUrl", avatarUrl));
     }
 
     /**

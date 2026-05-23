@@ -8,6 +8,7 @@ import com.collab.dto.UserUpdateDTO;
 import com.collab.entity.User;
 import com.collab.vo.UserVO;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -22,9 +23,7 @@ public interface UserService extends IService<User> {
 
     List<UserVO> listUser();
 
-    Page<UserVO> pageUser(Integer pageNum,
-                          Integer pageSize,
-                          String keyword);
+    Page<UserVO> pageUser(Integer pageNum, Integer pageSize, String keyword);
 
     UserVO detail(Long id);
 
@@ -33,4 +32,11 @@ public interface UserService extends IService<User> {
     void deleteUser(Long id);
 
     void logout(HttpServletRequest request);
+
+    /**
+     * 上传当前登录用户的头像
+     * @param file 头像文件
+     * @return 头像访问URL
+     */
+    String uploadAvatar(MultipartFile file);
 }
