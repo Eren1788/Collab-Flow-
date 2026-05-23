@@ -84,3 +84,13 @@ export function getRoleListApi() {
     method: 'get'
   })
 }
+
+/**
+ * 获取当前登录用户信息
+ */
+export function getUserInfoApi() {
+  return request({
+    url: '/user/info',
+    method: 'get'
+  })
+}

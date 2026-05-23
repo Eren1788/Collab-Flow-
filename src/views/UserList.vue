@@ -19,9 +19,35 @@
       </div>
     </el-card>
 
-    <!-- 表格 -->
+    <!-- 当前用户个人信息卡片（置顶显示） -->
+    <el-card class="my-info-card" shadow="hover" v-if="myInfo">
+      <template #header>
+        <div class="card-header">
+          <span><el-icon><User /></el-icon> 我的信息</span>
+          <el-button type="primary" size="small" @click="openEditDialog(myInfo)">编辑我的信息</el-button>
+        </div>
+      </template>
+      <el-descriptions :column="2" border>
+        <el-descriptions-item label="用户名">{{ myInfo.username }}</el-descriptions-item>
+        <el-descriptions-item label="昵称">{{ myInfo.nickname || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="职位">{{ myInfo.roleName || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="邮箱">{{ myInfo.email || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="手机号">{{ myInfo.phone || '-' }}</el-descriptions-item>
+      </el-descriptions>
+    </el-card>
+
+    <!-- 员工列表标题 -->
+    <div class="employee-list-title">
+      <el-divider content-position="left">
+        <span style="font-size: 16px; font-weight: bold; color: #409eff;">
+          当前系统的所有员工信息
+        </span>
+      </el-divider>
+    </div>
+
+    <!-- 用户表格（不包含当前登录用户） -->
     <el-card>
-      <el-table :data="userList" border stripe>
+      <el-table :data="filteredUserList" border stripe>
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="username" label="用户名" />
         <el-table-column prop="nickname" label="昵称" />
@@ -48,15 +74,14 @@
           </template>
         </el-table-column>
 
-        <!-- 操作列：编辑按钮仅对超级管理员 或 本人 可见 -->
         <el-table-column label="操作" width="220">
           <template #default="scope">
-            <!-- 编辑按钮：超级管理员 或 当前登录用户本人 -->
+            <!-- 编辑按钮：超级管理员 或 当前登录用户本人（但本人已不在列表中，所以只有超级管理员可编辑他人） -->
             <el-button
               type="primary"
               size="small"
               @click="openEditDialog(scope.row)"
-              v-if="isSuperAdmin || scope.row.id === userStore.info.id"
+              v-if="isSuperAdmin"
             >
               编辑
             </el-button>
@@ -84,7 +109,7 @@
       />
     </el-card>
 
-    <!-- 编辑用户弹窗 -->
+    <!-- 编辑用户弹窗（复用） -->
     <el-dialog v-model="editDialogVisible" title="编辑用户" width="500px">
       <el-form :model="editForm" label-width="80px">
         <el-form-item label="用户名">
@@ -99,7 +124,6 @@
         <el-form-item label="手机号">
           <el-input v-model="editForm.phone" />
         </el-form-item>
-        <!-- 职位字段：仅超级管理员可见且可修改 -->
         <el-form-item label="职位" v-if="isSuperAdmin">
           <el-select
             v-model="editForm.roleId"
@@ -130,12 +154,12 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { User } from '@element-plus/icons-vue'
-import { getUserPageApi, deleteUserApi, updateUserApi, updateUserStatusApi, getRoleListApi } from '../api/user'
+import { getUserPageApi, deleteUserApi, updateUserApi, updateUserStatusApi, getRoleListApi, getUserInfoApi } from '../api/user'
 import { useUserStore } from '../store/user'
 
 const userStore = useUserStore()
 
-// 判断当前登录用户是否是超级管理员（roleId === 1 或 roleName === '超级管理员'）
+// 判断当前登录用户是否是超级管理员
 const isSuperAdmin = computed(() => {
   const info = userStore.info
   return info?.roleId === 1 || info?.roleName === '超级管理员'
@@ -156,10 +180,13 @@ const currentUserRole = computed(() => {
   return '用户'
 })
 
+// 当前用户个人信息（用于顶部卡片）
+const myInfo = computed(() => userStore.info)
+
 // 搜索表单
 const searchForm = reactive({ username: '' })
 
-// 用户列表
+// 用户列表（原始数据，包含自己）
 const userList = ref<any[]>([])
 
 // 角色列表
@@ -182,6 +209,13 @@ const editForm = reactive({
   phone: '',
   roleId: null as number | null,
   status: null as number | null
+})
+
+// 过滤掉当前登录用户后的列表
+const filteredUserList = computed(() => {
+  const currentUserId = userStore.info?.id
+  if (!currentUserId) return userList.value
+  return userList.value.filter(user => user.id !== currentUserId)
 })
 
 // 获取用户列表
@@ -210,19 +244,16 @@ const loadRoleList = async () => {
 
 // 打开编辑弹窗
 const openEditDialog = (row: any) => {
-  // 基本字段
   editForm.id = row.id
   editForm.username = row.username
   editForm.nickname = row.nickname || ''
   editForm.email = row.email || ''
   editForm.phone = row.phone || ''
 
-  // 只有超级管理员才复制 roleId 和 status
   if (isSuperAdmin.value) {
     editForm.roleId = row.roleId || null
     editForm.status = row.status
   } else {
-    // 非管理员（包括项目经理）清空这两个字段
     editForm.roleId = null
     editForm.status = null
   }
@@ -232,14 +263,12 @@ const openEditDialog = (row: any) => {
 // 保存编辑
 const handleUpdateUser = async () => {
   try {
-    // 构建提交数据：基础字段
     const updateData: any = {
       id: editForm.id,
       nickname: editForm.nickname,
       email: editForm.email,
       phone: editForm.phone
     }
-    // 只有超级管理员才能提交 roleId 和 status
     if (isSuperAdmin.value) {
       if (editForm.roleId !== null) updateData.roleId = editForm.roleId
       if (editForm.status !== null) updateData.status = editForm.status
@@ -247,7 +276,13 @@ const handleUpdateUser = async () => {
     await updateUserApi(updateData)
     ElMessage.success('修改成功')
     editDialogVisible.value = false
-    loadUserList()  // 刷新列表
+    await loadUserList()  // 刷新列表
+
+    // 如果修改的是自己，同时更新 store 中的用户信息
+    if (editForm.id === userStore.info.id) {
+      const res: any = await getUserInfoApi()
+      userStore.setUserInfo(res.data)
+    }
   } catch (error: any) {
     console.error('修改失败:', error)
   }
@@ -263,7 +298,7 @@ const handleDelete = async (id: number) => {
   } catch {}
 }
 
-// 修改状态（仅超级管理员可见）
+// 修改状态（仅超级管理员）
 const changeStatus = async (row: any) => {
   try {
     const newStatus = row.status === 1 ? 0 : 1
@@ -304,5 +339,28 @@ onMounted(() => {
 }
 .welcome-info .el-icon {
   font-size: 16px;
+}
+
+/* 我的信息卡片样式 */
+.my-info-card {
+  margin-bottom: 20px;
+  border-left: 4px solid #409eff;
+}
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.card-header span {
+  font-size: 16px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 员工列表标题样式 */
+.employee-list-title {
+  margin: 8px 0 16px 0;
 }
 </style>
