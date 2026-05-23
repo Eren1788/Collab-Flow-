@@ -74,20 +74,17 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="220">
+        <!-- 操作列：仅超级管理员可见（修改点：添加 v-if="isSuperAdmin"） -->
+        <el-table-column label="操作" width="220" v-if="isSuperAdmin">
           <template #default="scope">
-            <!-- 编辑按钮：超级管理员 或 当前登录用户本人（但本人已不在列表中，所以只有超级管理员可编辑他人） -->
             <el-button
               type="primary"
               size="small"
               @click="openEditDialog(scope.row)"
-              v-if="isSuperAdmin"
             >
               编辑
             </el-button>
-            <!-- 删除按钮：仅超级管理员 -->
             <el-button
-              v-if="isSuperAdmin"
               type="danger"
               size="small"
               @click="handleDelete(scope.row.id)"
