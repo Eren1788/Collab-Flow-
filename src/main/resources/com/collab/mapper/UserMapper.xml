@@ -27,7 +27,7 @@
                 AND u.username LIKE CONCAT('%', #{keyword}, '%')
             </if>
         </where>
-        ORDER BY u.id DESC
+        ORDER BY u.id ASC
     </select>
 
     <select id="selectUserListWithRole" resultType="com.collab.vo.UserVO">
@@ -47,7 +47,7 @@
                            ON u.id = ur.user_id
                  LEFT JOIN role r
                            ON ur.role_id = r.id
-        ORDER BY u.id DESC
+        ORDER BY u.id ASC
     </select>
 
 </mapper>
