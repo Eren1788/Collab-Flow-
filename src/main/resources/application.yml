@@ -22,6 +22,12 @@ spring:
       database: 0 # 新容器中直接用默认库
       connect-timeout: 5000
 
+#文件上传大小限制
+  servlet:
+    multipart:
+      max-file-size: 20MB      # 单个文件最大大小
+      max-request-size: 20MB   # 总请求数据最大大小
+
 #mybatis-plus的配置
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml

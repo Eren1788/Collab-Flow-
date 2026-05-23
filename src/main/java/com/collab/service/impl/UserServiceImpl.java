@@ -221,93 +221,64 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     @Transactional(rollbackFor = Exception.class)
     public void updateUser(UserUpdateDTO dto) {
 
+        // 1. 检查用户是否存在
         User dbUser = userMapper.selectById(dto.getId());
-
         if (dbUser == null) {
             throw new BusinessException("用户不存在");
         }
 
-        /**
-         * 当前登录用户
-         */
+        // 2. 获取当前登录用户ID
         Long currentUserId = LoginUserContext.getUserId();
 
-
-        /**
-         * 是否管理员
-         */
+        // 3. 是否管理员
         boolean isAdmin = userRoleMapper.existsAdminRole(currentUserId);
 
-        /**
-         * 普通信息修改
-         * 普通成员也允许
-         */
+        // 4. 【新增】非管理员只能修改自己的信息
+        if (!isAdmin && !currentUserId.equals(dto.getId())) {
+            throw new BusinessException("您没有权限修改其他用户的信息");
+        }
+
+        // 5. 普通信息修改（昵称、头像、邮箱、手机号）
+        //    普通成员也可以修改自己的这些字段
         if (dto.getNickname() != null) {
             dbUser.setNickname(dto.getNickname());
         }
-
         if (dto.getAvatar() != null) {
             dbUser.setAvatar(dto.getAvatar());
         }
-
         if (dto.getEmail() != null) {
             dbUser.setEmail(dto.getEmail());
         }
-
         if (dto.getPhone() != null) {
             dbUser.setPhone(dto.getPhone());
         }
 
-        /**
-         * 状态修改
-         * 只有管理员允许
-         */
+        // 6. 状态修改：只有管理员允许
         if (dto.getStatus() != null) {
-
             if (!isAdmin) {
                 throw new BusinessException("只有管理员才能修改用户状态");
             }
-
             dbUser.setStatus(dto.getStatus());
         }
 
-        /**
-         * 更新 user 表
-         */
+        // 7. 更新 user 表
         userMapper.updateById(dbUser);
 
-        /**
-         * 修改角色（职位）
-         * 只有管理员允许
-         */
+        // 8. 修改角色（职位）：只有管理员允许
         if (dto.getRoleId() != null) {
-
             if (!isAdmin) {
                 throw new BusinessException("只有管理员才能修改职位");
             }
-
-            LambdaQueryWrapper<UserRole> wrapper =
-                    new LambdaQueryWrapper<>();
-
+            LambdaQueryWrapper<UserRole> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(UserRole::getUserId, dto.getId());
-
-            UserRole userRole =
-                    userRoleMapper.selectOne(wrapper);
-
+            UserRole userRole = userRoleMapper.selectOne(wrapper);
             if (userRole != null) {
-
                 userRole.setRoleId(dto.getRoleId());
-
                 userRoleMapper.updateById(userRole);
-
             } else {
-
                 UserRole newUserRole = new UserRole();
-
                 newUserRole.setUserId(dto.getId());
-
                 newUserRole.setRoleId(dto.getRoleId());
-
                 userRoleMapper.insert(newUserRole);
             }
         }

@@ -6,10 +6,12 @@ import com.collab.mapper.PermissionMapper;
 import com.collab.mapper.RolePermissionMapper;
 import com.collab.mapper.UserRoleMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
@@ -19,25 +21,16 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @RequiredArgsConstructor
 public class WebMvcConfig implements WebMvcConfigurer {
 
-    /**
-     * 注册RedisTemplate
-     */
     private final RedisTemplate<String, Object> redisTemplate;
-
-    /**
-     * 注册权限拦截器
-     */
     private final UserRoleMapper userRoleMapper;
     private final RolePermissionMapper rolePermissionMapper;
     private final PermissionMapper permissionMapper;
 
+    @Value("${file.upload-path}")
+    private String uploadPath;
 
-    /**
-     * 注册JWT拦截器
-     */
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-
         registry.addInterceptor(new JwtInterceptor(redisTemplate))
                 .addPathPatterns("/**")
                 // 放行接口
@@ -45,6 +38,10 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         // 用户模块
                         "/user/login",
                         "/user/register",
+
+                        // Logo 公开接口（获取 URL 无需登录）
+                        "/logo/url",
+                        "/logo/image",
 
                         // knife4j
                         "/doc.html",
@@ -54,7 +51,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/webjars/**",
 
                         // 静态资源
-                        "/error"
+                        "/error",
+                        "/uploads/**"
                 );
         registry.addInterceptor(
                 new PermissionInterceptor(
@@ -65,24 +63,20 @@ public class WebMvcConfig implements WebMvcConfigurer {
         );
     }
 
-    /**
-     * 配置跨域:
-     *      前端的访问地址是：localhost:5173
-     *      后端的访问地址是：localhost:8080
-     *      出现跨域问题，后端要配置跨域类
-     */
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-                // 前端地址
                 .allowedOriginPatterns("*")
-                // 请求方式
                 .allowedMethods("*")
-                // 请求头
                 .allowedHeaders("*")
-                // 是否携带cookie
                 .allowCredentials(true)
-                // 最大缓存时间
                 .maxAge(3600);
+    }
+
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        String location = "file:" + uploadPath + "/";
+        registry.addResourceHandler("/uploads/**")
+                .addResourceLocations(location);
     }
 }
