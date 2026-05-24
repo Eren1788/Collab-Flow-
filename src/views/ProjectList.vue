@@ -23,7 +23,7 @@
           <el-button type="primary" @click="loadProjectList">搜索</el-button>
         </div>
         <div class="right">
-          <el-button type="primary" @click="openAddDialog">新增项目</el-button>
+          <el-button v-if="isSuperAdmin" type="primary" @click="openAddDialog">新增项目</el-button>
         </div>
       </div>
     </el-card>
@@ -53,22 +53,21 @@
 
         <el-table-column prop="createTime" label="创建时间" width="180" />
 
-        <!-- 操作列：两行布局，居中 -->
         <el-table-column label="操作" width="120" fixed="right" align="center">
           <template #default="scope">
             <div class="action-buttons">
-              <el-button type="primary" size="small" @click="handleEdit(scope.row)">编辑</el-button>
+              <el-button v-if="isSuperAdmin" type="primary" size="small" @click="handleEdit(scope.row)">编辑</el-button>
               <el-button type="success" size="small" @click="handleMember(scope.row)">成员</el-button>
             </div>
             <div class="action-buttons">
               <el-button type="warning" size="small" @click="handleDetail(scope.row)">详情</el-button>
-              <el-button type="danger" size="small" @click="handleDelete(scope.row.id)">删除</el-button>
+              <el-button v-if="isSuperAdmin" type="danger" size="small" @click="handleDelete(scope.row.id)">删除</el-button>
             </div>
           </template>
         </el-table-column>
       </el-table>
 
-      <!-- 分页 -->
+      <!-- 分页：使用插槽自定义总条数显示为中文 -->
       <div class="pagination">
         <el-pagination
           background
@@ -77,7 +76,11 @@
           :page-size="pageSize"
           :current-page="pageNum"
           @current-change="handlePageChange"
-        />
+        >
+          <template #total>
+            <span>共 {{ total }} 条</span>
+          </template>
+        </el-pagination>
       </div>
     </el-card>
 
@@ -106,7 +109,7 @@
 
     <!-- 项目成员弹窗 -->
     <el-dialog v-model="memberDialogVisible" title="项目成员" width="600px">
-      <div class="member-toolbar">
+      <div class="member-toolbar" v-if="isSuperAdmin || isProjectManager">
         <el-input v-model="memberForm.userId" placeholder="请输入用户ID" style="width:200px" />
         <el-button type="primary" @click="addMember">添加成员</el-button>
       </div>
@@ -114,7 +117,7 @@
         <el-table-column prop="userId" label="用户ID" />
         <el-table-column prop="username" label="用户名" />
         <el-table-column prop="nickname" label="昵称" />
-        <el-table-column label="操作" width="120">
+        <el-table-column label="操作" width="120" v-if="isSuperAdmin">
           <template #default="scope">
             <el-button type="danger" size="small" @click="handleDeleteMember(scope.row.id)">删除</el-button>
           </template>
@@ -125,12 +128,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../utils/request'
+import { useUserStore } from '../store/user'
 
 const router = useRouter()
+const userStore = useUserStore()
+
+const isSuperAdmin = computed(() => {
+  const info = userStore.info
+  return info?.roleId === 1 || info?.roleName === '超级管理员'
+})
+
+const isProjectManager = computed(() => {
+  const info = userStore.info
+  return info?.roleId === 2 || info?.roleName === '项目经理'
+})
 
 const tableData = ref([])
 const total = ref(0)
