@@ -72,6 +72,14 @@ const routes = [
       },
 
       /**
+       * 任务详情页
+       */
+      {
+        path:'/task/detail/:id',
+        component:()=>import('../views/TaskDetail.vue')
+      },
+
+      /**
        * 评论管理
        */
       {

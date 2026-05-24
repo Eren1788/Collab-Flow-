@@ -76,28 +76,235 @@
         </el-tab-pane>
 
         <el-tab-pane label="项目任务" name="task">
-          <el-table :data="taskList" border stripe>
-            <el-table-column prop="id" label="ID" width="80" />
-            <el-table-column prop="title" label="任务标题" />
-            <el-table-column prop="status" label="任务状态">
-              <template #default="scope">
-                <el-tag v-if="scope.row.status === 0" type="info">待开始</el-tag>
-                <el-tag v-else-if="scope.row.status === 1" type="primary">进行中</el-tag>
-                <el-tag v-else-if="scope.row.status === 2" type="success">已完成</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="priority" label="优先级">
-              <template #default="scope">
-                <el-tag v-if="scope.row.priority === 1" type="danger">紧急</el-tag>
-                <el-tag v-else type="info">普通</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="deadline" label="截止时间" width="180" />
-          </el-table>
-          <el-empty v-if="taskList.length === 0" description="暂无任务" />
-        </el-tab-pane>
+
+  <div class="task-toolbar">
+
+    <el-button
+      type="primary"
+      @click="openAddTaskDialog"
+    >
+      新增任务
+    </el-button>
+
+  </div>
+
+  <el-table
+    :data="taskList"
+    border
+    stripe
+  >
+
+    <el-table-column
+      prop="id"
+      label="ID"
+      width="80"
+    />
+
+    <el-table-column
+  prop="title"
+  label="任务标题"
+  min-width="220"
+>
+
+  <template #default="scope">
+
+    <el-link
+      type="primary"
+      @click="$router.push(`/task/detail/${scope.row.id}`)"
+    >
+      {{ scope.row.title }}
+    </el-link>
+
+  </template>
+
+</el-table-column>
+
+    <el-table-column
+      prop="status"
+      label="任务状态"
+      width="120"
+    >
+
+      <template #default="scope">
+
+        <el-tag
+          v-if="scope.row.status === 0"
+          type="info"
+        >
+          待开始
+        </el-tag>
+
+        <el-tag
+          v-else-if="scope.row.status === 1"
+          type="primary"
+        >
+          进行中
+        </el-tag>
+
+        <el-tag
+          v-else
+          type="success"
+        >
+          已完成
+        </el-tag>
+
+      </template>
+
+    </el-table-column>
+
+    <el-table-column
+      prop="priority"
+      label="优先级"
+      width="120"
+    >
+
+      <template #default="scope">
+
+        <el-tag
+          v-if="scope.row.priority === 3"
+          type="danger"
+        >
+          高
+        </el-tag>
+
+        <el-tag
+          v-else-if="scope.row.priority === 2"
+          type="warning"
+        >
+          中
+        </el-tag>
+
+        <el-tag v-else>
+          低
+        </el-tag>
+
+      </template>
+
+    </el-table-column>
+
+    <el-table-column
+      prop="executorName"
+      label="执行人"
+      width="140"
+    />
+
+    <el-table-column
+      prop="endTime"
+      label="截止时间"
+      width="180"
+    />
+
+    <el-table-column
+      label="操作"
+      width="220"
+      fixed="right"
+    >
+
+      <template #default="scope">
+
+        <el-button
+          type="primary"
+          size="small"
+          @click="handleEditTask(scope.row)"
+        >
+          编辑
+        </el-button>
+
+        <el-button
+          type="danger"
+          size="small"
+          @click="handleDeleteTask(scope.row.id)"
+        >
+          删除
+        </el-button>
+
+      </template>
+
+    </el-table-column>
+
+  </el-table>
+
+  <el-empty
+    v-if="taskList.length === 0"
+    description="暂无任务"
+  />
+
+</el-tab-pane>
       </el-tabs>
     </el-card>
+    <!-- 新增/编辑任务 -->
+
+<el-dialog
+  v-model="taskDialogVisible"
+  :title="isEditTask ? '编辑任务' : '新增任务'"
+  width="650px"
+>
+
+  <el-form
+    :model="taskForm"
+    label-width="100px"
+  >
+
+    <el-form-item label="任务标题">
+
+      <el-input v-model="taskForm.title" />
+
+    </el-form-item>
+
+    <el-form-item label="任务描述">
+
+      <el-input
+        v-model="taskForm.content"
+        type="textarea"
+        :rows="4"
+      />
+
+    </el-form-item>
+
+    <el-form-item label="优先级">
+
+      <el-select
+        v-model="taskForm.priority"
+        style="width:100%"
+      >
+
+        <el-option label="低" :value="1" />
+        <el-option label="中" :value="2" />
+        <el-option label="高" :value="3" />
+
+      </el-select>
+
+    </el-form-item>
+
+    <el-form-item label="截止时间">
+
+      <el-date-picker
+        v-model="taskForm.endTime"
+        type="datetime"
+        value-format="YYYY-MM-DD HH:mm:ss"
+        style="width:100%"
+      />
+
+    </el-form-item>
+
+  </el-form>
+
+  <template #footer>
+
+    <el-button @click="taskDialogVisible = false">
+      取消
+    </el-button>
+
+    <el-button
+      type="primary"
+      @click="submitTask"
+    >
+      确定
+    </el-button>
+
+  </template>
+
+</el-dialog>
   </div>
 </template>
 
@@ -105,6 +312,16 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import request from '../utils/request'
+import {
+  ElMessage,
+  ElMessageBox
+} from 'element-plus'
+
+import {
+  addTaskApi,
+  updateTaskApi,
+  deleteTaskApi
+} from '../api/task'
 
 const route = useRoute()
 const projectId = route.params.id
@@ -129,6 +346,19 @@ const statistics = reactive({
 })
 
 const progress = ref(0)
+const taskDialogVisible = ref(false)
+
+const isEditTask = ref(false)
+
+const taskForm = reactive<any>({
+  id:null,
+  title:'',
+  content:'',
+  projectId:Number(projectId),
+  priority:1,
+  status:0,
+  endTime:''
+})
 
 const loadProjectDetail = async () => {
   const res: any = await request({ url: `/project/detail/${projectId}`, method: 'get' })
@@ -172,6 +402,94 @@ const calculateStatistics = () => {
   progress.value = statistics.total ? Math.round(statistics.completed / statistics.total * 100) : 0
 }
 
+
+/**
+ * 新增任务
+ */
+const openAddTaskDialog = ()=>{
+
+  isEditTask.value = false
+
+  resetTaskForm()
+
+  taskDialogVisible.value = true
+}
+
+/**
+ * 编辑任务
+ */
+const handleEditTask = (row:any)=>{
+
+  isEditTask.value = true
+
+  Object.assign(taskForm,row)
+
+  taskDialogVisible.value = true
+}
+
+/**
+ * 提交任务
+ */
+const submitTask = async ()=>{
+
+  if(isEditTask.value){
+
+    await updateTaskApi(taskForm)
+
+    ElMessage.success('修改成功')
+
+  }else{
+
+    await addTaskApi(taskForm)
+
+    ElMessage.success('新增成功')
+  }
+
+  taskDialogVisible.value = false
+
+  loadTaskList()
+}
+
+/**
+ * 删除任务
+ */
+const handleDeleteTask = (id:number)=>{
+
+  ElMessageBox.confirm(
+    '确认删除该任务吗？',
+    '提示',
+    {
+      type:'warning'
+    }
+  ).then(async ()=>{
+
+    await deleteTaskApi(id)
+
+    ElMessage.success('删除成功')
+
+    loadTaskList()
+  })
+}
+
+/**
+ * 重置
+ */
+const resetTaskForm = ()=>{
+
+  taskForm.id = null
+
+  taskForm.title = ''
+
+  taskForm.content = ''
+
+  taskForm.projectId = Number(projectId)
+
+  taskForm.priority = 1
+
+  taskForm.status = 0
+
+  taskForm.endTime = ''
+}
 onMounted(() => {
   loadProjectDetail()
   loadMemberList()
@@ -232,5 +550,10 @@ onMounted(() => {
 }
 .activity-content {
   line-height: 24px;
+}
+.task-toolbar{
+  margin-bottom:20px;
+  display:flex;
+  justify-content:flex-end;
 }
 </style>
