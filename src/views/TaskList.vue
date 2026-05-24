@@ -15,7 +15,8 @@
             <div class="title">任务总数</div>
 
             <div class="value">
-              {{ statistics.total || 0 }}
+              <!-- {{ statistics.total || 0 }} -->
+                {{ statistics.total || 0 }}
             </div>
 
           </div>
@@ -33,7 +34,9 @@
             <div class="title">进行中</div>
 
             <div class="value">
-              {{ statistics.processing || 0 }}
+              // 任务总数
+              <!-- {{ statistics.processing || 0 }} -->
+              {{ statistics.doing || 0 }}
             </div>
 
           </div>
@@ -51,7 +54,9 @@
             <div class="title">已完成</div>
 
             <div class="value">
-              {{ statistics.finished || 0 }}
+              
+              <!-- {{ statistics.finished || 0 }} -->
+                {{ statistics.done || 0 }}
             </div>
 
           </div>
@@ -69,7 +74,9 @@
             <div class="title">已逾期</div>
 
             <div class="value">
-              {{ statistics.timeout || 0 }}
+              
+              <!-- {{ statistics.timeout || 0 }} -->
+                {{ statistics.todo || 0 }}
             </div>
 
           </div>
@@ -102,12 +109,10 @@
             style="width:140px"
           >
 
-            <el-option label="待处理" :value="1" />
-
-            <el-option label="进行中" :value="2" />
-
-            <el-option label="已完成" :value="3" />
-
+            <el-option label="待开始" :value="0" />
+            <el-option label="进行中" :value="1" />
+            <el-option label="已完成" :value="2" />
+            
           </el-select>
 
           <el-select
@@ -222,33 +227,33 @@
 
           <template #default="scope">
 
-            <el-tag
-              v-if="scope.row.status === 1"
-              type="info"
-            >
-              待处理
-            </el-tag>
+        <el-tag
+          v-if="scope.row.status === 0"
+          type="info"
+        >
+          待开始
+        </el-tag>
 
-            <el-tag
-              v-else-if="scope.row.status === 2"
-              type="primary"
-            >
-              进行中
-            </el-tag>
+        <el-tag
+          v-else-if="scope.row.status === 1"
+          type="primary"
+        >
+          进行中
+        </el-tag>
 
-            <el-tag
-              v-else
-              type="success"
-            >
-              已完成
-            </el-tag>
+        <el-tag
+          v-else-if="scope.row.status === 2"
+          type="success"
+        >
+          已完成
+        </el-tag>
 
-          </template>
+</template>
 
         </el-table-column>
 
         <el-table-column
-          prop="deadline"
+          prop="endTime"
           label="截止时间"
           width="180"
         />
@@ -338,7 +343,7 @@
         <el-form-item label="任务描述">
 
           <el-input
-            v-model="form.description"
+            v-model="form.content"
             type="textarea"
             :rows="4"
           />
@@ -371,7 +376,7 @@
         <el-form-item label="截止时间">
 
           <el-date-picker
-            v-model="form.deadline"
+            v-model="form.endTime"
             type="datetime"
             value-format="YYYY-MM-DD HH:mm:ss"
             style="width:100%"
@@ -456,11 +461,9 @@
             style="width:100%"
           >
 
-            <el-option label="待处理" :value="1" />
-
-            <el-option label="进行中" :value="2" />
-
-            <el-option label="已完成" :value="3" />
+            <el-option label="待开始" :value="0" />
+            <el-option label="进行中" :value="1" />
+            <el-option label="已完成" :value="2" />
 
           </el-select>
 
@@ -535,10 +538,10 @@ const isEdit = ref(false)
 const form = reactive<any>({
   id:null,
   title:'',
-  description:'',
+  content:'',
   projectId:'',
   priority:1,
-  deadline:''
+  endTime:''
 })
 
 const assignForm = reactive<any>({
@@ -779,13 +782,13 @@ const resetForm = ()=>{
 
   form.title = ''
 
-  form.description = ''
+  form.content = ''
 
   form.projectId = ''
 
   form.priority = 1
 
-  form.deadline = ''
+  form.endTime = ''
 }
 
 onMounted(()=>{

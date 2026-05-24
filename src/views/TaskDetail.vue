@@ -351,7 +351,7 @@ const loadCommentList = async ()=>{
 
     const res:any = await request({
 
-      url:`/comment/task/${taskId}`,
+      url:`/comment/list/${taskId}`,
 
       method:'get'
     })

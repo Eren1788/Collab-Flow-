@@ -52,3 +52,14 @@ export const getTaskDetailApi = (id:number)=>{
     method:'get'
   })
 }
+
+/**
+ * 修改任务状态
+ */
+export const updateTaskStatusApi = (data: any) => {
+  return request({
+    url: '/task/status',
+    method: 'put',
+    data
+  })
+}
