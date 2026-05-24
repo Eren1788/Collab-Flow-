@@ -9,6 +9,12 @@ import TaskList from '../views/TaskList.vue'
 import CommentList from '../views/CommentList.vue'
 import FileList from '../views/FileList.vue'
 
+/* ========================= */
+/* 【新增】导入项目详情页 */
+/* ========================= */
+
+import ProjectDetail from '../views/ProjectDetail.vue'
+
 import { useUserStore } from '../store/user'
 
 const routes = [
@@ -46,6 +52,15 @@ const routes = [
       {
         path:'projects',
         component:ProjectList
+      },
+
+      /* ========================= */
+      /* 【新增】项目详情页路由 */
+      /* ========================= */
+
+      {
+        path:'project/detail/:id',
+        component:ProjectDetail
       },
 
       /**
