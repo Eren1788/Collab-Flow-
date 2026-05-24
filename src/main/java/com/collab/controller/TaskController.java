@@ -12,6 +12,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @Slf4j
 @RestController
 @RequestMapping("/task")
@@ -128,6 +130,30 @@ public class TaskController {
     public Result<Object> statistics(){
 
         return Result.success(taskService.statistics());
+    }
+
+    /**
+     * 发送疑问
+     */
+    @PostMapping("/question")
+    public Result<Void> sendQuestion(@RequestBody Map<String, Object> payload) {
+        Long taskId = Long.valueOf(payload.get("taskId").toString());
+        Long receiverId = Long.valueOf(payload.get("receiverId").toString());
+        String content = (String) payload.get("content");
+        taskService.sendQuestion(taskId, receiverId, content);
+        return Result.success();
+    }
+
+    /**
+     * 回复疑问
+     */
+    @PostMapping("/reply")
+    public Result<Void> sendReply(@RequestBody Map<String, Object> payload) {
+        Long taskId = Long.valueOf(payload.get("taskId").toString());
+        Long receiverId = Long.valueOf(payload.get("receiverId").toString());
+        String content = (String) payload.get("content");
+        taskService.sendReply(taskId, receiverId, content);
+        return Result.success();
     }
 
 }

@@ -1,6 +1,7 @@
 package com.collab.service.impl;
 
-import com.collab.entity.ProjectActivity;
+import com.collab.entity.*;
+import com.collab.mapper.*;
 import com.collab.service.NotificationService;
 import com.collab.service.ProjectActivityService;
 import com.collab.websocket.NotificationMessage;
@@ -13,21 +14,14 @@ import com.collab.common.utils.LoginUserContext;
 import com.collab.dto.TaskAssignDTO;
 import com.collab.dto.TaskDTO;
 import com.collab.dto.TaskStatusDTO;
-import com.collab.entity.Project;
-import com.collab.entity.Task;
-import com.collab.entity.User;
-import com.collab.mapper.ProjectMapper;
-import com.collab.mapper.TaskMapper;
-import com.collab.mapper.UserMapper;
 import com.collab.service.TaskService;
 import com.collab.vo.TaskVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -39,6 +33,8 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
     private final ProjectMapper projectMapper;
     private final NotificationService notificationService;
     private final ProjectActivityService projectActivityService;
+    private final UserRoleMapper userRoleMapper;
+    private final ProjectMemberMapper projectMemberMapper;
 
     @Override
     public void addTask(TaskDTO dto) {
@@ -287,6 +283,86 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
         );
     }
 
+    /**
+     * 发送疑问（修改为指定接收人）
+     * @param taskId 任务ID
+     * @param receiverId 接收人ID（必须是项目经理）
+     * @param content 疑问内容
+     */
+    @Override
+    public void sendQuestion(Long taskId, Long receiverId, String content) {
+        // 1. 获取任务信息
+        Task task = taskMapper.selectById(taskId);
+        if (task == null) {
+            throw new BusinessException("任务不存在");
+        }
+        Long currentUserId = LoginUserContext.getUserId();
+
+        // 2. 校验接收人是否为项目经理（roleId = 2）或超级管理员（可选，根据需求可只允许项目经理）
+        Long roleId = userRoleMapper.getRoleIdByUserId(receiverId);
+        if (roleId == null || roleId != 2L) {
+            throw new BusinessException("只能向项目经理发送疑问");
+        }
+
+        // 3. 创建通知
+        String notificationContent = String.format("任务【%s】收到新疑问：%s", task.getTitle(), content);
+        notificationService.saveNotification(
+                receiverId,
+                currentUserId,
+                "QUESTION",
+                notificationContent,
+                taskId
+        );
+
+        // 4. WebSocket 实时推送
+        NotificationMessage message = new NotificationMessage(
+                "QUESTION",
+                notificationContent,
+                taskId,
+                System.currentTimeMillis()
+        );
+        NotificationWebSocketHandler.sendMessage(receiverId, message);
+    }
+
+    @Override
+    public void sendReply(Long taskId, Long receiverId, String content) {
+        // 1. 校验权限：只有项目经理或超级管理员可以回复
+        Long currentUserId = LoginUserContext.getUserId();
+        boolean isAdmin = userRoleMapper.existsAdminRole(currentUserId);
+        // 判断是否为项目经理（roleId=2）
+        Long roleId = userRoleMapper.getRoleIdByUserId(currentUserId);
+        boolean isProjectManager = roleId != null && roleId == 2L;
+
+        if (!isAdmin && !isProjectManager) {
+            throw new BusinessException("只有项目经理或管理员可以回复疑问");
+        }
+
+        // 2. 获取任务信息
+        Task task = taskMapper.selectById(taskId);
+        if (task == null) {
+            throw new BusinessException("任务不存在");
+        }
+
+        // 3. 创建回复通知
+        String notificationContent = String.format("任务【%s】收到回复：%s", task.getTitle(), content);
+        notificationService.saveNotification(
+                receiverId,
+                currentUserId,
+                "REPLY",
+                notificationContent,
+                taskId
+        );
+
+        // WebSocket 实时推送
+        NotificationMessage message = new NotificationMessage(
+                "REPLY",
+                notificationContent,
+                taskId,
+                System.currentTimeMillis()
+        );
+        NotificationWebSocketHandler.sendMessage(receiverId, message);
+    }
+
     @Override
     public Map<String, Object> statistics() {
 
@@ -353,6 +429,10 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
         }
 
         vo.setDeadline(task.getEndTime());
+
+        vo.setCreatorId(task.getCreatorId());
+
+        vo.setExecutorId(task.getExecutorId());
 
         return vo;
     }
