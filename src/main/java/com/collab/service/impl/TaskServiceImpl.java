@@ -1,6 +1,8 @@
 package com.collab.service.impl;
 
+import com.collab.entity.ProjectActivity;
 import com.collab.service.NotificationService;
+import com.collab.service.ProjectActivityService;
 import com.collab.websocket.NotificationMessage;
 import com.collab.websocket.NotificationWebSocketHandler;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -36,6 +38,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
     private final UserMapper userMapper;
     private final ProjectMapper projectMapper;
     private final NotificationService notificationService;
+    private final ProjectActivityService projectActivityService;
 
     @Override
     public void addTask(TaskDTO dto) {
@@ -47,6 +50,23 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
         task.setCreatorId(LoginUserContext.getUserId());
 
         taskMapper.insert(task);
+
+        /*
+         * =========================
+         * 任务创建动态
+         * =========================
+         */
+        ProjectActivity activity = new ProjectActivity();
+
+        activity.setProjectId(task.getProjectId());
+
+        activity.setUserId(LoginUserContext.getUserId());
+
+        activity.setType("TASK_CREATE");
+
+        activity.setContent("创建了任务：" + task.getTitle());
+
+        projectActivityService.addActivity(activity);
 
         /**
          * 新任务通知执行人
@@ -108,6 +128,11 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
         Page<Task> page = new Page<>(pageNum,pageSize);
 
         LambdaQueryWrapper<Task> wrapper = new LambdaQueryWrapper<>();
+
+        //添加判断
+        if (projectId != null) {
+            wrapper.eq(Task::getProjectId, projectId);
+        }
 
         wrapper.eq(
                 projectId != null,
@@ -326,6 +351,8 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
 
             vo.setExecutorName(executor.getNickname());
         }
+
+        vo.setDeadline(task.getEndTime());
 
         return vo;
     }

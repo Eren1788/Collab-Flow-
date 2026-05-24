@@ -2,6 +2,8 @@ package com.collab.vo;
 
 import lombok.Data;
 
+import java.time.LocalDateTime;
+
 @Data
 public class TaskVO {
 
@@ -20,4 +22,6 @@ public class TaskVO {
     private String creatorName;
 
     private String executorName;
+
+    private LocalDateTime deadline;  // 对应数据库 end_time
 }

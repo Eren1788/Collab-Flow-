@@ -1,6 +1,8 @@
 package com.collab.vo;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
+import java.time.LocalDateTime;
 
 @Data
 public class ProjectVO {
@@ -16,4 +18,7 @@ public class ProjectVO {
     private String creatorName;
 
     private Integer taskCount;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime createTime;
 }

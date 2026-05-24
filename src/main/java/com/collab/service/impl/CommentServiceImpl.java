@@ -1,23 +1,25 @@
 package com.collab.service.impl;
 
-import com.collab.entity.Task;
-import com.collab.mapper.TaskMapper;
-import com.collab.websocket.NotificationMessage;
-import com.collab.websocket.NotificationWebSocketHandler;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.collab.common.utils.LoginUserContext;
 import com.collab.dto.CommentDTO;
 import com.collab.entity.Comment;
+import com.collab.entity.ProjectActivity;
+import com.collab.entity.Task;
 import com.collab.entity.User;
 import com.collab.mapper.CommentMapper;
+import com.collab.mapper.TaskMapper;
 import com.collab.mapper.UserMapper;
 import com.collab.service.CommentService;
+import com.collab.service.NotificationService;
+import com.collab.service.ProjectActivityService;
 import com.collab.vo.CommentVO;
+import com.collab.websocket.NotificationMessage;
+import com.collab.websocket.NotificationWebSocketHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
-import com.collab.service.NotificationService;
 
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -35,6 +37,8 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
 
     private final NotificationService notificationService;
 
+    private final ProjectActivityService projectActivityService;
+
     @Override
     public void addComment(CommentDTO dto) {
 
@@ -50,6 +54,9 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
             comment.setParentId(0L);
         }
 
+        /**
+         * 先保存评论
+         */
         commentMapper.insert(comment);
 
         /**
@@ -57,7 +64,25 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
          */
         Task task = taskMapper.selectById(comment.getTaskId());
 
+        /**
+         * 评论时记录项目动态
+         */
         if (task != null) {
+
+            ProjectActivity activity = new ProjectActivity();
+
+            // Comment 实体里没有 projectId
+            // 所以从 task 获取 projectId
+            activity.setProjectId(task.getProjectId());
+
+            activity.setUserId(comment.getUserId());
+
+            activity.setType("COMMENT");
+
+            activity.setContent("发表评论：" + comment.getContent());
+
+            projectActivityService.addActivity(activity);
+
             String content = "任务收到新评论：" + task.getTitle();
 
             /**
@@ -80,11 +105,11 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
                  * 2、WebSocket推送
                  */
                 NotificationMessage message = new NotificationMessage(
-                                "COMMENT",
-                                content,
-                                task.getId(),
-                                System.currentTimeMillis()
-                        );
+                        "COMMENT",
+                        content,
+                        task.getId(),
+                        System.currentTimeMillis()
+                );
 
                 NotificationWebSocketHandler.sendMessage(
                         task.getCreatorId(),
@@ -121,11 +146,11 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
                      * 2、WebSocket推送
                      */
                     NotificationMessage message = new NotificationMessage(
-                                    "COMMENT",
-                                    content,
-                                    task.getId(),
-                                    System.currentTimeMillis()
-                            );
+                            "COMMENT",
+                            content,
+                            task.getId(),
+                            System.currentTimeMillis()
+                    );
 
                     NotificationWebSocketHandler.sendMessage(
                             task.getExecutorId(),
@@ -186,7 +211,8 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
 
         if (comment.getCreateTime() != null) {
 
-            vo.setCreateTime(comment.getCreateTime()
+            vo.setCreateTime(
+                    comment.getCreateTime()
                             .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
             );
         }

@@ -16,10 +16,7 @@ public interface ProjectService extends IService<Project> {
 
     List<ProjectVO> listProject();
 
-    Page<ProjectVO> pageProject(Integer pageNum,
-                                Integer pageSize,
-                                String keyword,
-                                Integer status);
+    Page<ProjectVO> pageProject(Integer pageNum, Integer pageSize, String keyword, Integer status);
 
     ProjectVO detail(Long id);
 
@@ -30,5 +27,7 @@ public interface ProjectService extends IService<Project> {
     void addMember(ProjectMemberDTO dto);
 
     List<Object> memberList(Long projectId);
+
+    void deleteMember(Long id);
 
 }

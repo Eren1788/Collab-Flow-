@@ -81,7 +81,6 @@ public class ProjectController {
     /**
      * 删除项目
      */
-    //TODO aop功能待完善
     @DeleteMapping("/delete/{id}")
     public Result<Void> delete(@PathVariable Long id){
 
@@ -114,6 +113,19 @@ public class ProjectController {
         return Result.success(
                 projectService.memberList(projectId)
         );
+    }
+
+    /**
+     * 删除项目成员
+     */
+    @DeleteMapping("/member/delete/{id}")
+    public Result<Void> deleteMember(
+            @PathVariable Long id
+    ){
+
+        projectService.deleteMember(id);
+
+        return Result.success();
     }
 
 }
