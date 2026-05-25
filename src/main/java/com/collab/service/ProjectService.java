@@ -9,6 +9,7 @@ import com.collab.vo.ProjectVO;
 
 
 import java.util.List;
+import java.util.Map;
 
 public interface ProjectService extends IService<Project> {
 
@@ -29,5 +30,7 @@ public interface ProjectService extends IService<Project> {
     List<Object> memberList(Long projectId);
 
     void deleteMember(Long id);
+
+    List<Map<String, Object>> getProjectStatistics(Long projectId);
 
 }

@@ -18,6 +18,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -33,6 +34,7 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
     private final ProjectActivityService projectActivityService;
     private final UserRoleMapper userRoleMapper;
     private final RoleMapper roleMapper;
+    private final FileInfoMapper fileInfoMapper;
 
     @Override
     public void addProject(ProjectDTO dto) {
@@ -152,6 +154,14 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
             map.put("nickname", user.getNickname());
             map.put("avatar", user.getAvatar());
             map.put("role", systemRoleName);
+
+            // 新增：加入时间（格式化）
+            if (member.getJoinTime() != null) {
+                map.put("joinTime", member.getJoinTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+            } else {
+                map.put("joinTime", "");
+            }
+
             list.add(map);
         }
         return list;
@@ -160,6 +170,58 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
     @Override
     public void deleteMember(Long id) {
         projectMemberMapper.deleteById(id);
+    }
+
+    @Override
+    public List<Map<String, Object>> getProjectStatistics(Long projectId) {
+        // 1. 获取项目成员
+        LambdaQueryWrapper<ProjectMember> memberWrapper = new LambdaQueryWrapper<>();
+        memberWrapper.eq(ProjectMember::getProjectId, projectId);
+        List<ProjectMember> members = projectMemberMapper.selectList(memberWrapper);
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (ProjectMember member : members) {
+            User user = userMapper.selectById(member.getUserId());
+            if (user == null) continue;
+
+            Map<String, Object> memberMap = new HashMap<>();
+            memberMap.put("userId", user.getId());
+            memberMap.put("username", user.getUsername());
+            memberMap.put("nickname", user.getNickname());
+            memberMap.put("avatar", user.getAvatar());
+
+            // 2. 统计该成员的任务
+            LambdaQueryWrapper<Task> taskWrapper = new LambdaQueryWrapper<>();
+            taskWrapper.eq(Task::getProjectId, projectId);
+            taskWrapper.eq(Task::getExecutorId, user.getId());
+            List<Task> tasks = taskMapper.selectList(taskWrapper);
+            long total = tasks.size();
+            long completed = tasks.stream().filter(t -> t.getStatus() == 2).count();
+            memberMap.put("totalTasks", total);
+            memberMap.put("completedTasks", completed);
+            memberMap.put("progress", total == 0 ? 0 : (int)(completed * 100 / total));
+
+            // 3. 查询该成员上传的文件
+            List<Map<String, Object>> files = new ArrayList<>();
+            for (Task task : tasks) {
+                LambdaQueryWrapper<FileInfo> fileWrapper = new LambdaQueryWrapper<>();
+                fileWrapper.eq(FileInfo::getTaskId, task.getId());
+                fileWrapper.eq(FileInfo::getUploaderId, user.getId());
+                List<FileInfo> taskFiles = fileInfoMapper.selectList(fileWrapper);
+                for (FileInfo file : taskFiles) {
+                    Map<String, Object> fileMap = new HashMap<>();
+                    fileMap.put("id", file.getId());
+                    fileMap.put("fileName", file.getName());
+                    fileMap.put("fileSize", file.getFileSize());
+                    fileMap.put("uploadTime", file.getUploadTime());
+                    fileMap.put("taskTitle", task.getTitle());
+                    files.add(fileMap);
+                }
+            }
+            memberMap.put("files", files);
+            result.add(memberMap);
+        }
+        return result;
     }
 
     private ProjectVO buildProjectVO(Project project) {

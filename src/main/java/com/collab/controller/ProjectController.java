@@ -128,4 +128,12 @@ public class ProjectController {
         return Result.success();
     }
 
+    /**
+     * 项目成员完成情况统计
+     */
+    @GetMapping("/statistics/{projectId}")
+    public Result<Object> statistics(@PathVariable Long projectId) {
+        return Result.success(projectService.getProjectStatistics(projectId));
+    }
+
 }

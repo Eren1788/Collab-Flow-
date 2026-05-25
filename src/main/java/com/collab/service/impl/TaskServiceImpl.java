@@ -434,6 +434,8 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
 
         vo.setExecutorId(task.getExecutorId());
 
+        vo.setCreateTime(task.getCreateTime());
+
         return vo;
     }
 }

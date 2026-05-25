@@ -25,7 +25,9 @@ public class TaskVO {
 
     private LocalDateTime deadline;  // 对应数据库 end_time
 
-    private Long creatorId;    // 新增：任务创建者ID，用于回复时确定接收人
+    private Long creatorId;    // 任务创建者ID，用于回复时确定接收人
 
-    private Long executorId;  // 新增
+    private Long executorId;
+
+    private LocalDateTime createTime;
 }

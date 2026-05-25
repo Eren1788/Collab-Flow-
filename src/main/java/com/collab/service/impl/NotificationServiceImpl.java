@@ -1,5 +1,6 @@
 package com.collab.service.impl;
 
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.collab.common.utils.LoginUserContext;
 import com.collab.entity.Notification;
@@ -25,9 +26,9 @@ import java.util.stream.Collectors;
 public class NotificationServiceImpl implements NotificationService {
 
     private final NotificationMapper notificationMapper;
-    private final UserMapper userMapper;       // 新增
-    private final TaskMapper taskMapper;       // 新增
-    private final ProjectMapper projectMapper; // 新增
+    private final UserMapper userMapper;
+    private final TaskMapper taskMapper;
+    private final ProjectMapper projectMapper;
 
     @Override
     public List<NotificationVO> myNotifications() {
@@ -111,5 +112,17 @@ public class NotificationServiceImpl implements NotificationService {
         notification.setBusinessId(businessId);
         notification.setIsRead(0);
         notificationMapper.insert(notification);
+    }
+
+    @Override
+    public void deleteNotifications(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        Long currentUserId = LoginUserContext.getUserId();
+        LambdaQueryWrapper<Notification> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(Notification::getId, ids);
+        wrapper.eq(Notification::getReceiverId, currentUserId); // 只能删除自己的
+        notificationMapper.delete(wrapper);
     }
 }

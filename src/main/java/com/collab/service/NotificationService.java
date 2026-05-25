@@ -36,4 +36,9 @@ public interface NotificationService {
             String content,
             Long businessId
     );
+
+    /**
+     * 批量删除通知（仅限自己的）
+     */
+    void deleteNotifications(List<Long> ids);
 }

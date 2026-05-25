@@ -5,6 +5,8 @@ import com.collab.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/notification")
 @RequiredArgsConstructor
@@ -53,6 +55,15 @@ public class NotificationController {
 
         notificationService.readAll();
 
+        return Result.success();
+    }
+
+    /**
+     * 批量删除通知（仅删除当前登录用户自己的通知）
+     */
+    @DeleteMapping("/delete")
+    public Result<Void> deleteNotifications(@RequestBody List<Long> ids) {
+        notificationService.deleteNotifications(ids);
         return Result.success();
     }
 }
