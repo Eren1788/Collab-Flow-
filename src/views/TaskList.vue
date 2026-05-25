@@ -1,10 +1,10 @@
 <template>
   <div class="task-container">
 
-    <!-- 统计卡片（可点击跳转） -->
-    <el-row :gutter="20">
+    <!-- 统计卡片：仅超级管理员可见 -->
+    <el-row :gutter="20" v-if="isSuperAdmin">
       <el-col :span="6">
-        <el-card shadow="hover" class="stat-card" :class="{ active: activeFilter === 'total' }" @click="goToFilter('total')">
+        <el-card shadow="hover" class="stat-card" :class="{ active: activeStat === 'total' }" @click="filterByStatus('total')">
           <div class="stat-card-inner">
             <div class="title">任务总数</div>
             <div class="value">{{ statistics.total || 0 }}</div>
@@ -12,7 +12,7 @@
         </el-card>
       </el-col>
       <el-col :span="6">
-        <el-card shadow="hover" class="stat-card" :class="{ active: activeFilter === 'doing' }" @click="goToFilter('doing')">
+        <el-card shadow="hover" class="stat-card" :class="{ active: activeStat === 'doing' }" @click="filterByStatus('doing')">
           <div class="stat-card-inner">
             <div class="title">进行中</div>
             <div class="value">{{ statistics.doing || 0 }}</div>
@@ -20,7 +20,7 @@
         </el-card>
       </el-col>
       <el-col :span="6">
-        <el-card shadow="hover" class="stat-card" :class="{ active: activeFilter === 'done' }" @click="goToFilter('done')">
+        <el-card shadow="hover" class="stat-card" :class="{ active: activeStat === 'done' }" @click="filterByStatus('done')">
           <div class="stat-card-inner">
             <div class="title">已完成</div>
             <div class="value">{{ statistics.done || 0 }}</div>
@@ -28,7 +28,7 @@
         </el-card>
       </el-col>
       <el-col :span="6">
-        <el-card shadow="hover" class="stat-card" :class="{ active: activeFilter === 'expired' }" @click="goToFilter('expired')">
+        <el-card shadow="hover" class="stat-card" :class="{ active: activeStat === 'expired' }" @click="filterByStatus('expired')">
           <div class="stat-card-inner">
             <div class="title">已逾期</div>
             <div class="value">{{ statistics.expired || 0 }}</div>
@@ -71,7 +71,7 @@
             <el-option label="高" :value="3" />
           </el-select>
           <el-button type="primary" @click="searchTasks">搜索</el-button>
-          <el-button v-if="activeFilter !== null" @click="clearFilterAndSearch">清除筛选</el-button>
+          <el-button v-if="activeStat !== null" @click="clearFilterAndSearch">清除筛选</el-button>
         </div>
       </div>
     </el-card>
@@ -113,7 +113,6 @@
         </el-table-column>
       </el-table>
 
-      <!-- 分页 -->
       <div class="pagination">
         <el-pagination
           background
@@ -152,7 +151,7 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 
-// 权限判断
+// 判断当前用户是否是超级管理员
 const isSuperAdmin = computed(() => {
   const info = userStore.info
   return info?.roleId === 1 || info?.roleName === '超级管理员'
@@ -170,10 +169,9 @@ const status = ref<number | null>(null)
 const priority = ref<number | null>(null)
 const statistics = ref<any>({})
 
-// 当前激活的筛选类型
-const activeFilter = ref<string | null>(null)
+// 当前激活的筛选类型（用于高亮）
+const activeStat = ref<string | null>(null)
 
-// 辅助函数
 const getTaskProgress = (taskStatus: number) => {
   switch (taskStatus) {
     case 0: return 0
@@ -195,7 +193,6 @@ const calculateExpired = (tasks: TaskItem[]) => {
   }).length
 }
 
-// 加载任务列表
 const loadTaskList = async () => {
   try {
     const params: any = {
@@ -204,13 +201,13 @@ const loadTaskList = async () => {
       keyword: keyword.value,
       priority: priority.value
     }
-    if (activeFilter.value === 'doing') {
+    if (activeStat.value === 'doing') {
       params.status = 1
-    } else if (activeFilter.value === 'done') {
+    } else if (activeStat.value === 'done') {
       params.status = 2
-    } else if (activeFilter.value === 'expired') {
-      // 逾期筛选：后端不传status，前端过滤
-    } else if (activeFilter.value === 'total') {
+    } else if (activeStat.value === 'expired') {
+      // 逾期筛选不传status，前端过滤
+    } else if (activeStat.value === 'total') {
       // 全部
     } else {
       if (status.value !== null) {
@@ -225,22 +222,20 @@ const loadTaskList = async () => {
 
     const res: any = await getTaskPageApi(params)
     let records: TaskItem[] = res.data.records || []
-    // 逾期筛选前端过滤
-    if (activeFilter.value === 'expired') {
+    if (activeStat.value === 'expired') {
       const now = new Date().getTime()
       records = records.filter((task: TaskItem) => {
         return task.deadline && new Date(task.deadline).getTime() < now && task.status !== 2
       })
     }
     tableData.value = records
-    total.value = activeFilter.value === 'expired' ? records.length : res.data.total || 0
+    total.value = activeStat.value === 'expired' ? records.length : res.data.total || 0
     await loadStatistics()
   } catch (error) {
     ElMessage.error('加载任务列表失败')
   }
 }
 
-// 加载统计
 const loadStatistics = async () => {
   try {
     const params: any = {}
@@ -262,57 +257,53 @@ const loadStatistics = async () => {
   }
 }
 
-// 跳转筛选
-const goToFilter = (type: string) => {
-  if (activeFilter.value === type) {
+const filterByStatus = (type: string) => {
+  if (activeStat.value === type) {
     clearFilterAndSearch()
     return
   }
-  router.push({ path: '/tasks', query: { filter: type } })
+  activeStat.value = type
+  pageNum.value = 1
+  status.value = null
+  loadTaskList()
 }
 
-// 搜索按钮
 const searchTasks = () => {
-  router.push({ path: '/tasks', query: {} })
+  activeStat.value = null
+  pageNum.value = 1
+  loadTaskList()
 }
 
-// 清除所有筛选
 const clearFilterAndSearch = () => {
   keyword.value = ''
   status.value = null
   priority.value = null
+  activeStat.value = null
   pageNum.value = 1
-  router.push({ path: '/tasks', query: {} })
+  loadTaskList()
 }
 
-// 分页切换
 const handlePageChange = (page: number) => {
   pageNum.value = page
   loadTaskList()
 }
 
-// 初始化路由参数
-const initFromRoute = () => {
-  const filter = route.query.filter as string
-  if (filter === 'doing' || filter === 'done' || filter === 'expired' || filter === 'total') {
-    activeFilter.value = filter
+// 监听路由参数变化
+watch(() => route.query.filter, (newFilter) => {
+  if (newFilter === 'doing' || newFilter === 'done' || newFilter === 'expired' || newFilter === 'total') {
+    activeStat.value = newFilter as string
   } else {
-    activeFilter.value = null
+    activeStat.value = null
   }
   pageNum.value = 1
-  if (activeFilter.value) {
+  if (activeStat.value) {
     status.value = null
   }
   loadTaskList()
-}
-
-// 监听路由变化
-watch(() => route.query.filter, () => {
-  initFromRoute()
 })
 
 onMounted(() => {
-  initFromRoute()
+  loadTaskList()
 })
 </script>
 
