@@ -84,7 +84,7 @@
             <el-button v-if="canManage" type="success" @click="goToStatistics">查看成员完成情况</el-button>
           </div>
 
-          <!-- 我执行的任务（带操作栏，普通成员可见疑问/详情） -->
+          <!-- 我执行的任务（当前用户为执行人） -->
           <div v-if="myTasks.length > 0" class="my-tasks-section">
             <div class="my-tasks-header">
               <el-icon><Check /></el-icon>
@@ -135,11 +135,11 @@
             </el-table>
           </div>
 
-          <!-- 全部任务（排除我执行的任务），普通成员不显示任何操作按钮 -->
-          <div v-if="otherTasks.length > 0" class="all-tasks-header">
+          <!-- 全部任务（直接显示所有任务） -->
+          <div class="all-tasks-header">
             <span>全部任务</span>
           </div>
-          <el-table :data="otherTasks" border stripe>
+          <el-table :data="taskList" border stripe>
             <el-table-column prop="id" label="ID" width="80" />
             <el-table-column prop="title" label="任务标题" min-width="220">
               <template #default="scope">
@@ -162,13 +162,21 @@
                 <el-tag v-else>低</el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="executorName" label="执行人" width="140" />
+            <!-- 执行人列：多执行人显示 -->
+            <el-table-column label="执行人" width="140">
+              <template #default="scope">
+                <span v-if="scope.row.executorNames && scope.row.executorNames.length">
+                  {{ scope.row.executorNames.join('、') }}
+                </span>
+                <span v-else>-</span>
+              </template>
+            </el-table-column>
             <el-table-column label="截止时间" width="180">
               <template #default="scope">
                 {{ scope.row.deadline ? scope.row.deadline.replace('T', ' ') : '' }}
               </template>
             </el-table-column>
-            <!-- 操作列：只有管理员/项目经理才显示按钮，普通成员看不到任何操作 -->
+            <!-- 操作列：只有管理员/项目经理才显示 -->
             <el-table-column label="操作" width="280" fixed="right" v-if="canManage">
               <template #default="scope">
                 <el-button type="primary" size="small" @click="handleEditTask(scope.row)">编辑</el-button>
@@ -178,12 +186,12 @@
               </template>
             </el-table-column>
           </el-table>
-          <el-empty v-if="otherTasks.length === 0 && myTasks.length === 0" description="暂无任务" />
+          <el-empty v-if="taskList.length === 0" description="暂无任务" />
         </el-tab-pane>
       </el-tabs>
     </el-card>
 
-    <!-- 项目动态（已移至最底部） -->
+    <!-- 项目动态 -->
     <el-card shadow="never">
       <template #header>
         <div class="activity-header">
@@ -208,7 +216,6 @@
       </el-timeline>
     </el-card>
 
-    <!-- 以下弹窗保持不变（新增/编辑任务、状态、疑问、回复） -->
     <!-- 新增/编辑任务弹窗 -->
     <el-dialog v-model="taskDialogVisible" :title="isEditTask ? '编辑任务' : '新增任务'" width="650px">
       <el-form :model="taskForm" label-width="100px">
@@ -226,7 +233,13 @@
           </el-select>
         </el-form-item>
         <el-form-item label="执行人" v-if="canManage">
-          <el-select v-model="taskForm.executorId" placeholder="请选择执行人" clearable style="width:100%">
+          <el-select
+            v-model="taskForm.executorIds"
+            multiple
+            placeholder="请选择执行人"
+            clearable
+            style="width:100%"
+          >
             <el-option
               v-for="member in memberList"
               :key="member.userId"
@@ -343,18 +356,11 @@ const myProjectMember = computed(() => {
   return memberList.value.find(m => m.userId === currentUserId) || null
 })
 
-// 我执行的任务（当前用户为执行人）
+// 我执行的任务（当前用户为执行人之一）
 const myTasks = computed(() => {
   const currentUserId = userStore.info?.id
   if (!currentUserId) return []
-  return taskList.value.filter(task => task.executorId === currentUserId)
-})
-
-// 其他任务（排除我执行的任务）
-const otherTasks = computed(() => {
-  const currentUserId = userStore.info?.id
-  if (!currentUserId) return taskList.value
-  return taskList.value.filter(task => task.executorId !== currentUserId)
+  return taskList.value.filter(task => task.executorIds && task.executorIds.includes(currentUserId))
 })
 
 const projectInfo = reactive<any>({
@@ -387,7 +393,7 @@ const taskForm = reactive<any>({
   projectId: Number(projectId),
   priority: 1,
   status: 0,
-  executorId: null,
+  executorIds: [],
   endTime: ''
 })
 
@@ -534,7 +540,7 @@ const resetTaskForm = () => {
   taskForm.projectId = Number(projectId)
   taskForm.priority = 1
   taskForm.status = 0
-  taskForm.executorId = null
+  taskForm.executorIds = []
   taskForm.endTime = ''
 }
 
@@ -604,17 +610,18 @@ const sendReply = async () => {
     ElMessage.warning('请输入回复内容')
     return
   }
-  if (!replyTask.value.executorId) {
+  if (!replyTask.value.executorIds || replyTask.value.executorIds.length === 0) {
     ElMessage.warning('该任务暂无执行人，无法回复')
     return
   }
+  const receiverId = replyTask.value.executorIds[0]
   try {
     await request({
       url: '/task/reply',
       method: 'post',
       data: {
         taskId: replyTask.value.id,
-        receiverId: replyTask.value.executorId,
+        receiverId: receiverId,
         content: replyContent.value
       }
     })
@@ -635,101 +642,25 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.detail-container {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-}
-.title {
-  font-size: 24px;
-  font-weight: bold;
-  margin-bottom: 10px;
-}
-.description {
-  color: #666;
-}
-.statistics {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
-}
-.card-title {
-  color: #999;
-  margin-bottom: 15px;
-}
-.card-value {
-  font-size: 32px;
-  font-weight: bold;
-}
-.success {
-  color: #67c23a;
-}
-.primary {
-  color: #409eff;
-}
-.danger {
-  color: #f56c6c;
-}
-.progress-header {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 15px;
-}
-.activity-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.activity-title {
-  font-size: 18px;
-  font-weight: bold;
-}
-.activity-content {
-  line-height: 24px;
-}
-.card-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: bold;
-}
-.my-member-card {
-  margin-bottom: 0;
-  border-left: 4px solid #409eff;
-}
-.task-toolbar {
-  margin-bottom: 20px;
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-}
-.my-tasks-section {
-  margin-bottom: 24px;
-  border: 1px solid #e6a23c;
-  border-radius: 8px;
-  padding: 12px;
-  background-color: #fdf6ec;
-}
-.my-tasks-header {
-  font-size: 16px;
-  font-weight: bold;
-  color: #e6a23c;
-  margin-bottom: 12px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.all-tasks-header {
-  font-size: 15px;
-  font-weight: bold;
-  color: #333;
-  margin: 16px 0 12px 0;
-  padding-left: 8px;
-  border-left: 3px solid #409eff;
-}
+/* 样式与之前相同，此处省略，请保留原样式 */
+.detail-container { display: flex; flex-direction: column; gap: 20px; }
+.header { display: flex; justify-content: space-between; align-items: flex-start; }
+.title { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
+.description { color: #666; }
+.statistics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+.card-title { color: #999; margin-bottom: 15px; }
+.card-value { font-size: 32px; font-weight: bold; }
+.success { color: #67c23a; }
+.primary { color: #409eff; }
+.danger { color: #f56c6c; }
+.progress-header { display: flex; justify-content: space-between; margin-bottom: 15px; }
+.activity-header { display: flex; justify-content: space-between; align-items: center; }
+.activity-title { font-size: 18px; font-weight: bold; }
+.activity-content { line-height: 24px; }
+.card-header { display: flex; align-items: center; gap: 8px; font-weight: bold; }
+.my-member-card { margin-bottom: 0; border-left: 4px solid #409eff; }
+.task-toolbar { margin-bottom: 20px; display: flex; justify-content: flex-end; gap: 10px; }
+.my-tasks-section { margin-bottom: 24px; border: 1px solid #e6a23c; border-radius: 8px; padding: 12px; background-color: #fdf6ec; }
+.my-tasks-header { font-size: 16px; font-weight: bold; color: #e6a23c; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+.all-tasks-header { font-size: 15px; font-weight: bold; color: #333; margin: 16px 0 12px 0; padding-left: 8px; border-left: 3px solid #409eff; }
 </style>
