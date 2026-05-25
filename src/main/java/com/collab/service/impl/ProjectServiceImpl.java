@@ -64,16 +64,41 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
     }
 
     @Override
-    public Page<ProjectVO> pageProject(Integer pageNum, Integer pageSize, String keyword, Integer status) {
+    public Page<ProjectVO> pageProject(Integer pageNum, Integer pageSize, String keyword, Integer status, Long memberId) {
         Page<Project> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<Project> wrapper = new LambdaQueryWrapper<>();
         wrapper.like(StringUtils.hasText(keyword), Project::getName, keyword);
         wrapper.eq(status != null, Project::getStatus, status);
+
+        // 关键：如果传入了 memberId，则只查询该用户参与的项目
+        if (memberId != null) {
+            // 1. 查询该用户参与的项目ID列表
+            LambdaQueryWrapper<ProjectMember> memberWrapper = new LambdaQueryWrapper<>();
+            memberWrapper.eq(ProjectMember::getUserId, memberId);
+            List<ProjectMember> members = projectMemberMapper.selectList(memberWrapper);
+
+            if (members.isEmpty()) {
+                // 用户没有参与任何项目，直接返回空分页
+                Page<ProjectVO> empty = new Page<>(pageNum, pageSize);
+                empty.setRecords(Collections.emptyList());
+                empty.setTotal(0);
+                return empty;
+            }
+
+            List<Long> projectIds = members.stream()
+                    .map(ProjectMember::getProjectId)
+                    .collect(Collectors.toList());
+            wrapper.in(Project::getId, projectIds);
+        }
+
         wrapper.orderByDesc(Project::getId);
         Page<Project> projectPage = projectMapper.selectPage(page, wrapper);
         Page<ProjectVO> result = new Page<>();
         BeanUtils.copyProperties(projectPage, result);
-        List<ProjectVO> records = projectPage.getRecords().stream().map(this::buildProjectVO).collect(Collectors.toList());
+        List<ProjectVO> records = projectPage.getRecords()
+                .stream()
+                .map(this::buildProjectVO)
+                .collect(Collectors.toList());
         result.setRecords(records);
         return result;
     }
@@ -137,7 +162,6 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
                 log.warn("项目成员 userId={} 不存在于 user 表中，已跳过", member.getUserId());
                 continue;
             }
-            // 查询用户的系统职位（roleName）
             Long roleId = userRoleMapper.getRoleIdByUserId(user.getId());
             String systemRoleName = "";
             if (roleId != null) {
@@ -155,7 +179,6 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
             map.put("avatar", user.getAvatar());
             map.put("role", systemRoleName);
 
-            // 新增：加入时间（格式化）
             if (member.getJoinTime() != null) {
                 map.put("joinTime", member.getJoinTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
             } else {
@@ -174,7 +197,7 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
 
     @Override
     public List<Map<String, Object>> getProjectStatistics(Long projectId) {
-        // 1. 获取项目成员
+        // 获取项目成员
         LambdaQueryWrapper<ProjectMember> memberWrapper = new LambdaQueryWrapper<>();
         memberWrapper.eq(ProjectMember::getProjectId, projectId);
         List<ProjectMember> members = projectMemberMapper.selectList(memberWrapper);
@@ -190,7 +213,7 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
             memberMap.put("nickname", user.getNickname());
             memberMap.put("avatar", user.getAvatar());
 
-            // 2. 统计该成员的任务
+            // 统计任务
             LambdaQueryWrapper<Task> taskWrapper = new LambdaQueryWrapper<>();
             taskWrapper.eq(Task::getProjectId, projectId);
             taskWrapper.eq(Task::getExecutorId, user.getId());
@@ -201,7 +224,7 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
             memberMap.put("completedTasks", completed);
             memberMap.put("progress", total == 0 ? 0 : (int)(completed * 100 / total));
 
-            // 3. 查询该成员上传的文件
+            // 查询上传的文件
             List<Map<String, Object>> files = new ArrayList<>();
             for (Task task : tasks) {
                 LambdaQueryWrapper<FileInfo> fileWrapper = new LambdaQueryWrapper<>();
@@ -227,14 +250,11 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
     private ProjectVO buildProjectVO(Project project) {
         ProjectVO vo = new ProjectVO();
         BeanUtils.copyProperties(project, vo);
-        // 设置创建时间
         vo.setCreateTime(project.getCreateTime());
-        // 设置创建人昵称
         User creator = userMapper.selectById(project.getCreatorId());
         if (creator != null) {
             vo.setCreatorName(creator.getNickname());
         }
-        // 设置任务数量
         LambdaQueryWrapper<Task> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Task::getProjectId, project.getId());
         Long taskCount = taskMapper.selectCount(wrapper);

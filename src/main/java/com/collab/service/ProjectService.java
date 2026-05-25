@@ -17,7 +17,7 @@ public interface ProjectService extends IService<Project> {
 
     List<ProjectVO> listProject();
 
-    Page<ProjectVO> pageProject(Integer pageNum, Integer pageSize, String keyword, Integer status);
+    Page<ProjectVO> pageProject(Integer pageNum, Integer pageSize, String keyword, Integer status ,Long memberId);
 
     ProjectVO detail(Long id);
 

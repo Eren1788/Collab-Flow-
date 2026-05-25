@@ -45,17 +45,11 @@ public class ProjectController {
             @RequestParam Integer pageNum,
             @RequestParam Integer pageSize,
             @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) Integer status
+            @RequestParam(required = false) Integer status,
+            @RequestParam(required = false) Long memberId //用于非管理员过滤
     ){
 
-        return Result.success(
-                projectService.pageProject(
-                        pageNum,
-                        pageSize,
-                        keyword,
-                        status
-                )
-        );
+        return Result.success(projectService.pageProject(pageNum, pageSize, keyword, status, memberId));
     }
 
     /**
