@@ -35,6 +35,7 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
     private final UserRoleMapper userRoleMapper;
     private final RoleMapper roleMapper;
     private final FileInfoMapper fileInfoMapper;
+    private final TaskExecutorMapper taskExecutorMapper;  // 新增：用于多执行人查询
 
     @Override
     public void addProject(ProjectDTO dto) {
@@ -72,13 +73,11 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
 
         // 关键：如果传入了 memberId，则只查询该用户参与的项目
         if (memberId != null) {
-            // 1. 查询该用户参与的项目ID列表
             LambdaQueryWrapper<ProjectMember> memberWrapper = new LambdaQueryWrapper<>();
             memberWrapper.eq(ProjectMember::getUserId, memberId);
             List<ProjectMember> members = projectMemberMapper.selectList(memberWrapper);
 
             if (members.isEmpty()) {
-                // 用户没有参与任何项目，直接返回空分页
                 Page<ProjectVO> empty = new Page<>(pageNum, pageSize);
                 empty.setRecords(Collections.emptyList());
                 empty.setTotal(0);
@@ -213,18 +212,33 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
             memberMap.put("nickname", user.getNickname());
             memberMap.put("avatar", user.getAvatar());
 
-            // 统计任务
+            // 统计该用户作为执行人的任务（通过 task_executor 表）
+            LambdaQueryWrapper<TaskExecutor> teWrapper = new LambdaQueryWrapper<>();
+            teWrapper.eq(TaskExecutor::getUserId, user.getId());
+            List<TaskExecutor> teList = taskExecutorMapper.selectList(teWrapper);
+            if (teList.isEmpty()) {
+                memberMap.put("totalTasks", 0L);
+                memberMap.put("completedTasks", 0L);
+                memberMap.put("progress", 0);
+                memberMap.put("files", new ArrayList<>());
+                result.add(memberMap);
+                continue;
+            }
+            List<Long> taskIds = teList.stream().map(TaskExecutor::getTaskId).collect(Collectors.toList());
+
+            // 查询这些任务中属于当前项目的
             LambdaQueryWrapper<Task> taskWrapper = new LambdaQueryWrapper<>();
+            taskWrapper.in(Task::getId, taskIds);
             taskWrapper.eq(Task::getProjectId, projectId);
-            taskWrapper.eq(Task::getExecutorId, user.getId());
             List<Task> tasks = taskMapper.selectList(taskWrapper);
+
             long total = tasks.size();
             long completed = tasks.stream().filter(t -> t.getStatus() == 2).count();
             memberMap.put("totalTasks", total);
             memberMap.put("completedTasks", completed);
             memberMap.put("progress", total == 0 ? 0 : (int)(completed * 100 / total));
 
-            // 查询上传的文件
+            // 查询该成员上传的文件（原有逻辑不变）
             List<Map<String, Object>> files = new ArrayList<>();
             for (Task task : tasks) {
                 LambdaQueryWrapper<FileInfo> fileWrapper = new LambdaQueryWrapper<>();

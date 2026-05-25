@@ -22,7 +22,7 @@ public class Task {
 
     private Long creatorId;
 
-    private Long executorId;
+    //private Long executorId;
 
     private Integer status;
 

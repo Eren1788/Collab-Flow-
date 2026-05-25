@@ -19,6 +19,7 @@ import com.collab.vo.TaskVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.*;
@@ -35,79 +36,50 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
     private final ProjectActivityService projectActivityService;
     private final UserRoleMapper userRoleMapper;
     private final ProjectMemberMapper projectMemberMapper;
+    private final TaskExecutorMapper taskExecutorMapper;  // 新增
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void addTask(TaskDTO dto) {
-
+        // 1. 创建任务（注意：Task 实体中已无 executorId 字段）
         Task task = new Task();
-
-        BeanUtils.copyProperties(dto, task);
-
+        BeanUtils.copyProperties(dto, task);  // 只复制除 executorIds 外的公共属性
         task.setCreatorId(LoginUserContext.getUserId());
-
         taskMapper.insert(task);
 
-        /*
-         * =========================
-         * 任务创建动态
-         * =========================
-         */
+        // 2. 处理多执行人关联
+        if (dto.getExecutorIds() != null && !dto.getExecutorIds().isEmpty()) {
+            for (Long userId : dto.getExecutorIds()) {
+                TaskExecutor te = new TaskExecutor();
+                te.setTaskId(task.getId());
+                te.setUserId(userId);
+                taskExecutorMapper.insert(te);
+            }
+        }
+
+        // 3. 项目动态
         ProjectActivity activity = new ProjectActivity();
-
         activity.setProjectId(task.getProjectId());
-
         activity.setUserId(LoginUserContext.getUserId());
-
         activity.setType("TASK_CREATE");
-
         activity.setContent("创建了任务：" + task.getTitle());
-
         projectActivityService.addActivity(activity);
 
-        /**
-         * 新任务通知执行人
-         */
-        if (task.getExecutorId() != null) {
-
-            String content =
-                    "你有一个新的任务：" + task.getTitle();
-            /**
-             * 1、保存数据库通知
-             */
-            notificationService.saveNotification(
-                    task.getExecutorId(),
-                    LoginUserContext.getUserId(),
-                    "TASK_CREATE",
-                    content,
-                    task.getId()
-            );
-
-            /**
-             * 2、WebSocket实时推送
-             */
-            NotificationMessage message =
-                    new NotificationMessage(
-                            "TASK_CREATE",
-                            content,
-                            task.getId(),
-                            System.currentTimeMillis()
-                    );
-
-            NotificationWebSocketHandler.sendMessage(
-                    task.getExecutorId(),
-                    message
-            );
+        // 4. 通知所有执行人
+        if (dto.getExecutorIds() != null && !dto.getExecutorIds().isEmpty()) {
+            String content = "你有一个新的任务：" + task.getTitle();
+            for (Long executorId : dto.getExecutorIds()) {
+                notificationService.saveNotification(executorId, LoginUserContext.getUserId(), "TASK_CREATE", content, task.getId());
+                NotificationMessage message = new NotificationMessage("TASK_CREATE", content, task.getId(), System.currentTimeMillis());
+                NotificationWebSocketHandler.sendMessage(executorId, message);
+            }
         }
     }
 
     @Override
     public List<TaskVO> listTask() {
-
         List<Task> tasks = taskMapper.selectList(null);
-
-        return tasks.stream()
-                .map(this::buildTaskVO)
-                .collect(Collectors.toList());
+        return tasks.stream().map(this::buildTaskVO).collect(Collectors.toList());
     }
 
     @Override
@@ -120,61 +92,44 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
             Integer priority,
             String keyword
     ) {
-
-        Page<Task> page = new Page<>(pageNum,pageSize);
-
+        Page<Task> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<Task> wrapper = new LambdaQueryWrapper<>();
 
-        //添加判断
         if (projectId != null) {
             wrapper.eq(Task::getProjectId, projectId);
         }
+        if (status != null) {
+            wrapper.eq(Task::getStatus, status);
+        }
+        if (priority != null) {
+            wrapper.eq(Task::getPriority, priority);
+        }
+        if (StringUtils.hasText(keyword)) {
+            wrapper.like(Task::getTitle, keyword);
+        }
 
-        wrapper.eq(
-                projectId != null,
-                Task::getProjectId,
-                projectId
-        );
-
-        wrapper.eq(
-                status != null,
-                Task::getStatus,
-                status
-        );
-
-        wrapper.eq(
-                executorId != null,
-                Task::getExecutorId,
-                executorId
-        );
-
-        wrapper.eq(
-                priority != null,
-                Task::getPriority,
-                priority
-        );
-
-        wrapper.like(
-                StringUtils.hasText(keyword),
-                Task::getTitle,
-                keyword
-        );
+        // 按执行人过滤：查询 task_executor 表中包含该用户的任务ID
+        if (executorId != null) {
+            LambdaQueryWrapper<TaskExecutor> teWrapper = new LambdaQueryWrapper<>();
+            teWrapper.eq(TaskExecutor::getUserId, executorId);
+            List<TaskExecutor> teList = taskExecutorMapper.selectList(teWrapper);
+            if (teList.isEmpty()) {
+                // 没有关联任何任务，直接返回空分页
+                Page<TaskVO> empty = new Page<>(pageNum, pageSize);
+                empty.setRecords(Collections.emptyList());
+                empty.setTotal(0);
+                return empty;
+            }
+            List<Long> taskIds = teList.stream().map(TaskExecutor::getTaskId).collect(Collectors.toList());
+            wrapper.in(Task::getId, taskIds);
+        }
 
         wrapper.orderByDesc(Task::getId);
-
-        Page<Task> taskPage = taskMapper.selectPage(page,wrapper);
-
+        Page<Task> taskPage = taskMapper.selectPage(page, wrapper);
         Page<TaskVO> result = new Page<>();
-
-        BeanUtils.copyProperties(taskPage,result);
-
-        List<TaskVO> records = taskPage.getRecords()
-                        .stream()
-                        .map(this::buildTaskVO)
-                        .collect(Collectors.toList());
-
+        BeanUtils.copyProperties(taskPage, result);
+        List<TaskVO> records = taskPage.getRecords().stream().map(this::buildTaskVO).collect(Collectors.toList());
         result.setRecords(records);
-
         return result;
     }
 
@@ -185,257 +140,175 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void updateTask(TaskDTO dto) {
+        // 1. 更新任务基本信息
         Task task = new Task();
-        BeanUtils.copyProperties(dto,task);
+        BeanUtils.copyProperties(dto, task);
         taskMapper.updateById(task);
+
+        // 2. 更新执行人关联：先删除旧的，再插入新的
+        LambdaQueryWrapper<TaskExecutor> delWrapper = new LambdaQueryWrapper<>();
+        delWrapper.eq(TaskExecutor::getTaskId, dto.getId());
+        taskExecutorMapper.delete(delWrapper);
+
+        if (dto.getExecutorIds() != null && !dto.getExecutorIds().isEmpty()) {
+            for (Long userId : dto.getExecutorIds()) {
+                TaskExecutor te = new TaskExecutor();
+                te.setTaskId(dto.getId());
+                te.setUserId(userId);
+                taskExecutorMapper.insert(te);
+            }
+        }
+
+        // 3. 可选：给新执行人发送通知（这里简化，只更新关联）
+        // 如需发送通知，可对比新旧执行人列表，此处略
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void deleteTask(Long id) {
+        // 删除任务基本信息
         taskMapper.deleteById(id);
+        // 删除任务-执行人关联
+        LambdaQueryWrapper<TaskExecutor> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(TaskExecutor::getTaskId, id);
+        taskExecutorMapper.delete(wrapper);
     }
 
     @Override
     public void updateStatus(TaskStatusDTO dto) {
-
         Task task = taskMapper.selectById(dto.getId());
-
-        if(task == null){
+        if (task == null) {
             throw new BusinessException("任务不存在");
         }
-
         task.setStatus(dto.getStatus());
-
         taskMapper.updateById(task);
 
-        String content =
-                "任务状态已更新：" + task.getTitle();
-
-        /**
-         * 1、保存通知
-         */
-        notificationService.saveNotification(
-                task.getCreatorId(),
-                LoginUserContext.getUserId(),
-                "TASK_STATUS",
-                content,
-                task.getId()
-        );
-
-        /**
-         * 2、WebSocket推送
-         */
-        NotificationMessage message =
-                new NotificationMessage(
-                        "TASK_STATUS",
-                        content,
-                        task.getId(),
-                        System.currentTimeMillis()
-                );
-
-        NotificationWebSocketHandler.sendMessage(
-                task.getCreatorId(),
-                message
-        );
+        String content = "任务状态已更新：" + task.getTitle();
+        notificationService.saveNotification(task.getCreatorId(), LoginUserContext.getUserId(), "TASK_STATUS", content, task.getId());
+        NotificationMessage message = new NotificationMessage("TASK_STATUS", content, task.getId(), System.currentTimeMillis());
+        NotificationWebSocketHandler.sendMessage(task.getCreatorId(), message);
     }
 
     @Override
     public void assignTask(TaskAssignDTO dto) {
-
+        // 此方法仍用于单个指派，但建议改用多执行人方式。此处保留原逻辑（操作 task_executor 表）
         Task task = taskMapper.selectById(dto.getTaskId());
-
-        if(task == null){
+        if (task == null) {
             throw new BusinessException("任务不存在");
         }
-
-        task.setExecutorId(dto.getExecutorId());
-
-        taskMapper.updateById(task);
+        // 清除原有执行人，添加新的单个执行人
+        LambdaQueryWrapper<TaskExecutor> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(TaskExecutor::getTaskId, dto.getTaskId());
+        taskExecutorMapper.delete(wrapper);
+        TaskExecutor te = new TaskExecutor();
+        te.setTaskId(dto.getTaskId());
+        te.setUserId(dto.getExecutorId());
+        taskExecutorMapper.insert(te);
 
         String content = "你被指派了新任务：" + task.getTitle();
-
-        /**
-         * 1、保存通知
-         */
-        notificationService.saveNotification(
-                dto.getExecutorId(),
-                LoginUserContext.getUserId(),
-                "TASK_ASSIGN",
-                content,
-                task.getId()
-        );
-
-        /**
-         * 2、WebSocket推送
-         */
-        NotificationMessage message =
-                new NotificationMessage(
-                        "TASK_ASSIGN",
-                        content,
-                        task.getId(),
-                        System.currentTimeMillis()
-                );
-
-        NotificationWebSocketHandler.sendMessage(
-                dto.getExecutorId(),
-                message
-        );
+        notificationService.saveNotification(dto.getExecutorId(), LoginUserContext.getUserId(), "TASK_ASSIGN", content, task.getId());
+        NotificationMessage message = new NotificationMessage("TASK_ASSIGN", content, task.getId(), System.currentTimeMillis());
+        NotificationWebSocketHandler.sendMessage(dto.getExecutorId(), message);
     }
 
-    /**
-     * 发送疑问（修改为指定接收人）
-     * @param taskId 任务ID
-     * @param receiverId 接收人ID（必须是项目经理）
-     * @param content 疑问内容
-     */
     @Override
     public void sendQuestion(Long taskId, Long receiverId, String content) {
-        // 1. 获取任务信息
+        // 原有逻辑不变
         Task task = taskMapper.selectById(taskId);
         if (task == null) {
             throw new BusinessException("任务不存在");
         }
         Long currentUserId = LoginUserContext.getUserId();
-
-        // 2. 校验接收人是否为项目经理（roleId = 2）或超级管理员（可选，根据需求可只允许项目经理）
         Long roleId = userRoleMapper.getRoleIdByUserId(receiverId);
         if (roleId == null || roleId != 2L) {
             throw new BusinessException("只能向项目经理发送疑问");
         }
-
-        // 3. 创建通知
         String notificationContent = String.format("任务【%s】收到新疑问：%s", task.getTitle(), content);
-        notificationService.saveNotification(
-                receiverId,
-                currentUserId,
-                "QUESTION",
-                notificationContent,
-                taskId
-        );
-
-        // 4. WebSocket 实时推送
-        NotificationMessage message = new NotificationMessage(
-                "QUESTION",
-                notificationContent,
-                taskId,
-                System.currentTimeMillis()
-        );
+        notificationService.saveNotification(receiverId, currentUserId, "QUESTION", notificationContent, taskId);
+        NotificationMessage message = new NotificationMessage("QUESTION", notificationContent, taskId, System.currentTimeMillis());
         NotificationWebSocketHandler.sendMessage(receiverId, message);
     }
 
     @Override
     public void sendReply(Long taskId, Long receiverId, String content) {
-        // 1. 校验权限：只有项目经理或超级管理员可以回复
+        // 原有逻辑不变
         Long currentUserId = LoginUserContext.getUserId();
         boolean isAdmin = userRoleMapper.existsAdminRole(currentUserId);
-        // 判断是否为项目经理（roleId=2）
         Long roleId = userRoleMapper.getRoleIdByUserId(currentUserId);
         boolean isProjectManager = roleId != null && roleId == 2L;
-
         if (!isAdmin && !isProjectManager) {
             throw new BusinessException("只有项目经理或管理员可以回复疑问");
         }
-
-        // 2. 获取任务信息
         Task task = taskMapper.selectById(taskId);
         if (task == null) {
             throw new BusinessException("任务不存在");
         }
-
-        // 3. 创建回复通知
         String notificationContent = String.format("任务【%s】收到回复：%s", task.getTitle(), content);
-        notificationService.saveNotification(
-                receiverId,
-                currentUserId,
-                "REPLY",
-                notificationContent,
-                taskId
-        );
-
-        // WebSocket 实时推送
-        NotificationMessage message = new NotificationMessage(
-                "REPLY",
-                notificationContent,
-                taskId,
-                System.currentTimeMillis()
-        );
+        notificationService.saveNotification(receiverId, currentUserId, "REPLY", notificationContent, taskId);
+        NotificationMessage message = new NotificationMessage("REPLY", notificationContent, taskId, System.currentTimeMillis());
         NotificationWebSocketHandler.sendMessage(receiverId, message);
     }
 
     @Override
     public Map<String, Object> statistics() {
-
-        Map<String,Object> map = new HashMap<>();
-
+        Map<String, Object> map = new HashMap<>();
         Long total = taskMapper.selectCount(null);
-
         LambdaQueryWrapper<Task> todoWrapper = new LambdaQueryWrapper<>();
-
-        todoWrapper.eq(Task::getStatus,0);
-
+        todoWrapper.eq(Task::getStatus, 0);
         Long todo = taskMapper.selectCount(todoWrapper);
-
         LambdaQueryWrapper<Task> doingWrapper = new LambdaQueryWrapper<>();
-
-        doingWrapper.eq(Task::getStatus,1);
-
+        doingWrapper.eq(Task::getStatus, 1);
         Long doing = taskMapper.selectCount(doingWrapper);
-
         LambdaQueryWrapper<Task> doneWrapper = new LambdaQueryWrapper<>();
-
-        doneWrapper.eq(Task::getStatus,2);
-
+        doneWrapper.eq(Task::getStatus, 2);
         Long done = taskMapper.selectCount(doneWrapper);
-
-        map.put("total",total);
-
-        map.put("todo",todo);
-
-        map.put("doing",doing);
-
-        map.put("done",done);
-
+        map.put("total", total);
+        map.put("todo", todo);
+        map.put("doing", doing);
+        map.put("done", done);
         return map;
     }
 
     /**
-     * 封装 TaskVO
+     * 封装 TaskVO（支持多执行人）
      */
-    private TaskVO buildTaskVO(Task task){
-
+    private TaskVO buildTaskVO(Task task) {
         TaskVO vo = new TaskVO();
+        BeanUtils.copyProperties(task, vo);
 
-        BeanUtils.copyProperties(task,vo);
-
+        // 项目名称
         Project project = projectMapper.selectById(task.getProjectId());
-
-        if(project != null){
+        if (project != null) {
             vo.setProjectName(project.getName());
         }
-
+        // 创建人名称
         User creator = userMapper.selectById(task.getCreatorId());
-
-        if(creator != null){
-
+        if (creator != null) {
             vo.setCreatorName(creator.getNickname());
         }
 
-        User executor = userMapper.selectById(task.getExecutorId());
+        // 查询执行人列表
+        LambdaQueryWrapper<TaskExecutor> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(TaskExecutor::getTaskId, task.getId());
+        List<TaskExecutor> executors = taskExecutorMapper.selectList(wrapper);
 
-        if(executor != null){
-
-            vo.setExecutorName(executor.getNickname());
+        List<Long> executorIds = new ArrayList<>();
+        List<String> executorNames = new ArrayList<>();
+        for (TaskExecutor te : executors) {
+            User user = userMapper.selectById(te.getUserId());
+            if (user != null) {
+                executorIds.add(user.getId());
+                executorNames.add(user.getNickname() != null ? user.getNickname() : user.getUsername());
+            }
         }
+        vo.setExecutorIds(executorIds);
+        vo.setExecutorNames(executorNames);
 
         vo.setDeadline(task.getEndTime());
-
         vo.setCreatorId(task.getCreatorId());
-
-        vo.setExecutorId(task.getExecutorId());
-
         vo.setCreateTime(task.getCreateTime());
-
         return vo;
     }
 }

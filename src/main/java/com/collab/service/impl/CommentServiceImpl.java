@@ -7,8 +7,10 @@ import com.collab.dto.CommentDTO;
 import com.collab.entity.Comment;
 import com.collab.entity.ProjectActivity;
 import com.collab.entity.Task;
+import com.collab.entity.TaskExecutor;
 import com.collab.entity.User;
 import com.collab.mapper.CommentMapper;
+import com.collab.mapper.TaskExecutorMapper;
 import com.collab.mapper.TaskMapper;
 import com.collab.mapper.UserMapper;
 import com.collab.service.CommentService;
@@ -30,69 +32,38 @@ import java.util.stream.Collectors;
 public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> implements CommentService {
 
     private final CommentMapper commentMapper;
-
     private final UserMapper userMapper;
-
     private final TaskMapper taskMapper;
-
     private final NotificationService notificationService;
-
     private final ProjectActivityService projectActivityService;
+    private final TaskExecutorMapper taskExecutorMapper;  // 新增：用于查询多执行人
 
     @Override
     public void addComment(CommentDTO dto) {
-
         Comment comment = new Comment();
-
         BeanUtils.copyProperties(dto, comment);
-
         comment.setUserId(LoginUserContext.getUserId());
 
-        // 一级评论
         if (comment.getParentId() == null) {
-
             comment.setParentId(0L);
         }
 
-        /**
-         * 先保存评论
-         */
         commentMapper.insert(comment);
 
-        /**
-         * 查询任务
-         */
         Task task = taskMapper.selectById(comment.getTaskId());
-
-        /**
-         * 评论时记录项目动态
-         */
         if (task != null) {
-
+            // 项目动态
             ProjectActivity activity = new ProjectActivity();
-
-            // Comment 实体里没有 projectId
-            // 所以从 task 获取 projectId
             activity.setProjectId(task.getProjectId());
-
             activity.setUserId(comment.getUserId());
-
             activity.setType("COMMENT");
-
             activity.setContent("发表评论：" + comment.getContent());
-
             projectActivityService.addActivity(activity);
 
             String content = "任务收到新评论：" + task.getTitle();
 
-            /**
-             * 通知任务创建人
-             */
+            // 通知任务创建人（如果创建人不是评论人自己）
             if (!task.getCreatorId().equals(comment.getUserId())) {
-
-                /**
-                 * 1、保存通知
-                 */
                 notificationService.saveNotification(
                         task.getCreatorId(),
                         comment.getUserId(),
@@ -100,62 +71,37 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
                         content,
                         task.getId()
                 );
-
-                /**
-                 * 2、WebSocket推送
-                 */
                 NotificationMessage message = new NotificationMessage(
                         "COMMENT",
                         content,
                         task.getId(),
                         System.currentTimeMillis()
                 );
-
-                NotificationWebSocketHandler.sendMessage(
-                        task.getCreatorId(),
-                        message
-                );
+                NotificationWebSocketHandler.sendMessage(task.getCreatorId(), message);
             }
 
-            /**
-             * 通知任务执行人
-             */
-            if (
-                    task.getExecutorId() != null
-                            &&
-                            !task.getExecutorId().equals(comment.getUserId())
-            ) {
-
-                /**
-                 * 避免重复通知
-                 */
-                if (!task.getExecutorId().equals(task.getCreatorId())) {
-
-                    /**
-                     * 1、保存通知
-                     */
+            // 查询该任务的所有执行人，逐个通知（如果执行人不是评论人自己且不是创建人）
+            LambdaQueryWrapper<TaskExecutor> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(TaskExecutor::getTaskId, task.getId());
+            List<TaskExecutor> executors = taskExecutorMapper.selectList(wrapper);
+            for (TaskExecutor te : executors) {
+                Long executorId = te.getUserId();
+                // 避免重复通知创建人（如果创建人也作为执行人已通知过）
+                if (!executorId.equals(comment.getUserId()) && !executorId.equals(task.getCreatorId())) {
                     notificationService.saveNotification(
-                            task.getExecutorId(),
+                            executorId,
                             comment.getUserId(),
                             "COMMENT",
                             content,
                             task.getId()
                     );
-
-                    /**
-                     * 2、WebSocket推送
-                     */
                     NotificationMessage message = new NotificationMessage(
                             "COMMENT",
                             content,
                             task.getId(),
                             System.currentTimeMillis()
                     );
-
-                    NotificationWebSocketHandler.sendMessage(
-                            task.getExecutorId(),
-                            message
-                    );
+                    NotificationWebSocketHandler.sendMessage(executorId, message);
                 }
             }
         }
@@ -163,15 +109,10 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
 
     @Override
     public List<CommentVO> listComment(Long taskId) {
-
         LambdaQueryWrapper<Comment> wrapper = new LambdaQueryWrapper<>();
-
         wrapper.eq(Comment::getTaskId, taskId);
-
         wrapper.orderByAsc(Comment::getCreateTime);
-
         List<Comment> comments = commentMapper.selectList(wrapper);
-
         return comments.stream()
                 .map(this::buildCommentVO)
                 .collect(Collectors.toList());
@@ -179,44 +120,26 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
 
     @Override
     public void deleteComment(Long id) {
-
-        // 删除当前评论
         commentMapper.deleteById(id);
-
-        // 删除回复评论
         LambdaQueryWrapper<Comment> wrapper = new LambdaQueryWrapper<>();
-
         wrapper.eq(Comment::getParentId, id);
-
         commentMapper.delete(wrapper);
     }
 
-    /**
-     * 封装 CommentVO
-     */
     private CommentVO buildCommentVO(Comment comment) {
-
         CommentVO vo = new CommentVO();
-
         BeanUtils.copyProperties(comment, vo);
-
         User user = userMapper.selectById(comment.getUserId());
-
         if (user != null) {
-
             vo.setNickname(user.getNickname());
-
             vo.setAvatar(user.getAvatar());
         }
-
         if (comment.getCreateTime() != null) {
-
             vo.setCreateTime(
                     comment.getCreateTime()
                             .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
             );
         }
-
         return vo;
     }
 }
