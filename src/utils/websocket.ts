@@ -33,7 +33,6 @@ class WebSocketService {
      * 连接成功
      */
     this.socket.onopen = ()=>{
-
       console.log('WebSocket连接成功')
     }
 
@@ -47,24 +46,24 @@ class WebSocketService {
       const data = JSON.parse(event.data)
 
       /**
-       * 全局通知弹窗
+       * 全局通知弹窗（仅对非聊天消息弹窗，避免聊天消息重复弹窗）
+       * 聊天消息类型：NEW_COMMENT（任务评论）、NEW_PROJECT_COMMENT（项目评论）
+       * 其他类型如 TASK_ASSIGN、TASK_STATUS、QUESTION、REPLY 等才弹窗
        */
-      ElNotification({
-
-        title:'系统通知',
-
-        message:data.content,
-
-        type:'success',
-
-        duration:3000
-      })
+      const chatMessageTypes = ['NEW_COMMENT', 'NEW_PROJECT_COMMENT']
+      if (!chatMessageTypes.includes(data.type)) {
+        ElNotification({
+          title: '系统通知',
+          message: data.content,
+          type: 'success',
+          duration: 3000
+        })
+      }
 
       /**
-       * 通知所有监听器
+       * 通知所有监听器（用于聊天界面实时更新）
        */
       this.listeners.forEach(callback=>{
-
         callback(data)
       })
     }
@@ -73,7 +72,6 @@ class WebSocketService {
      * 关闭
      */
     this.socket.onclose = ()=>{
-
       console.log('WebSocket已断开')
     }
 
@@ -81,7 +79,6 @@ class WebSocketService {
      * 异常
      */
     this.socket.onerror = (error)=>{
-
       console.error('WebSocket异常',error)
     }
   }
@@ -90,7 +87,6 @@ class WebSocketService {
    * 注册监听器
    */
   addMessageListener(callback:(data:any)=>void){
-
     this.listeners.push(callback)
   }
 
@@ -98,20 +94,15 @@ class WebSocketService {
    * 移除监听器
    */
   removeMessageListener(callback:(data:any)=>void){
-
-    this.listeners =
-      this.listeners.filter(item=>item !== callback)
+    this.listeners = this.listeners.filter(item=>item !== callback)
   }
 
   /**
    * 断开连接
    */
   disconnect(){
-
     if(this.socket){
-
       this.socket.close()
-
       this.socket = null
     }
   }
@@ -120,13 +111,7 @@ class WebSocketService {
    * 发送消息
    */
   send(message:string){
-
-    if(
-      this.socket
-      &&
-      this.socket.readyState === WebSocket.OPEN
-    ){
-
+    if(this.socket && this.socket.readyState === WebSocket.OPEN){
       this.socket.send(message)
     }
   }
