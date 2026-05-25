@@ -65,16 +65,22 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
     }
 
     @Override
-    public Page<ProjectVO> pageProject(Integer pageNum, Integer pageSize, String keyword, Integer status, Long memberId) {
+    public Page<ProjectVO> pageProject(Integer pageNum, Integer pageSize, String keyword, Integer status) {
         Page<Project> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<Project> wrapper = new LambdaQueryWrapper<>();
         wrapper.like(StringUtils.hasText(keyword), Project::getName, keyword);
         wrapper.eq(status != null, Project::getStatus, status);
 
-        // 关键：如果传入了 memberId，则只查询该用户参与的项目
-        if (memberId != null) {
+        // 获取当前登录用户
+        Long currentUserId = LoginUserContext.getUserId();
+        // 判断是否为超级管理员（roleId = 1）
+        Long roleId = userRoleMapper.getRoleIdByUserId(currentUserId);
+        boolean isAdmin = (roleId != null && roleId == 1L);
+
+        // 如果不是超级管理员，则只查询该用户参与的项目
+        if (!isAdmin) {
             LambdaQueryWrapper<ProjectMember> memberWrapper = new LambdaQueryWrapper<>();
-            memberWrapper.eq(ProjectMember::getUserId, memberId);
+            memberWrapper.eq(ProjectMember::getUserId, currentUserId);
             List<ProjectMember> members = projectMemberMapper.selectList(memberWrapper);
 
             if (members.isEmpty()) {

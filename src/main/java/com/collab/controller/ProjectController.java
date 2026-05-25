@@ -1,5 +1,6 @@
 package com.collab.controller;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.collab.common.annotation.OperationLogAnnotation;
 import com.collab.common.result.Result;
 import com.collab.dto.ProjectDTO;
@@ -41,15 +42,12 @@ public class ProjectController {
      * 项目分页
      */
     @GetMapping("/page")
-    public Result<Object> page(
-            @RequestParam Integer pageNum,
-            @RequestParam Integer pageSize,
+    public Result<Page<ProjectVO>> page(
+            @RequestParam(defaultValue = "1") Integer pageNum,
+            @RequestParam(defaultValue = "10") Integer pageSize,
             @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) Integer status,
-            @RequestParam(required = false) Long memberId //用于非管理员过滤
-    ){
-
-        return Result.success(projectService.pageProject(pageNum, pageSize, keyword, status, memberId));
+            @RequestParam(required = false) Integer status) {
+        return Result.success(projectService.pageProject(pageNum, pageSize, keyword, status));
     }
 
     /**
