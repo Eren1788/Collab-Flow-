@@ -53,4 +53,6 @@ public interface TaskService extends IService<Task> {
      * @param content 回复内容
      */
     void sendReply(Long taskId, Long receiverId, String content);
+
+    void markTaskRead(Long taskId);
 }

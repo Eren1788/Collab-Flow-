@@ -15,9 +15,14 @@ public class Comment {
     private Long id;
 
     /**
-     * 任务ID
+     * 任务ID（任务评论时使用）
      */
     private Long taskId;
+
+    /**
+     * 项目ID（项目聊天室评论时使用）
+     */
+    private Long projectId;
 
     /**
      * 用户ID

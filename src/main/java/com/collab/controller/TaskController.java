@@ -156,4 +156,13 @@ public class TaskController {
         return Result.success();
     }
 
+    /**
+     * 标记已读
+     */
+    @PutMapping("/read/{taskId}")
+    public Result<Void> markTaskRead(@PathVariable Long taskId) {
+        taskService.markTaskRead(taskId);
+        return Result.success();
+    }
+
 }

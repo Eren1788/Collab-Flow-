@@ -6,9 +6,14 @@ import lombok.Data;
 public class CommentDTO {
 
     /**
-     * 任务ID
+     * 任务ID（与 projectId 二选一）
      */
     private Long taskId;
+
+    /**
+     * 项目ID（与 taskId 二选一）
+     */
+    private Long projectId;
 
     /**
      * 评论内容

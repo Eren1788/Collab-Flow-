@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -37,6 +38,8 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
     private final UserRoleMapper userRoleMapper;
     private final ProjectMemberMapper projectMemberMapper;
     private final TaskExecutorMapper taskExecutorMapper;  // 新增
+    private final TaskReadStatusMapper taskReadStatusMapper;
+    private final CommentMapper commentMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -108,13 +111,12 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
             wrapper.like(Task::getTitle, keyword);
         }
 
-        // 按执行人过滤：查询 task_executor 表中包含该用户的任务ID
+        // 按执行人过滤
         if (executorId != null) {
             LambdaQueryWrapper<TaskExecutor> teWrapper = new LambdaQueryWrapper<>();
             teWrapper.eq(TaskExecutor::getUserId, executorId);
             List<TaskExecutor> teList = taskExecutorMapper.selectList(teWrapper);
             if (teList.isEmpty()) {
-                // 没有关联任何任务，直接返回空分页
                 Page<TaskVO> empty = new Page<>(pageNum, pageSize);
                 empty.setRecords(Collections.emptyList());
                 empty.setTotal(0);
@@ -129,6 +131,34 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
         Page<TaskVO> result = new Page<>();
         BeanUtils.copyProperties(taskPage, result);
         List<TaskVO> records = taskPage.getRecords().stream().map(this::buildTaskVO).collect(Collectors.toList());
+
+        // 计算每个任务的未读评论数（当前登录用户）
+        Long currentUserId = LoginUserContext.getUserId();
+        if (currentUserId != null && !records.isEmpty()) {
+            List<Long> taskIds = records.stream().map(TaskVO::getId).collect(Collectors.toList());
+            // 获取每个任务的最新已读时间
+            LambdaQueryWrapper<TaskReadStatus> readWrapper = new LambdaQueryWrapper<>();
+            readWrapper.eq(TaskReadStatus::getUserId, currentUserId);
+            readWrapper.in(TaskReadStatus::getTaskId, taskIds);
+            List<TaskReadStatus> readStatusList = taskReadStatusMapper.selectList(readWrapper);
+            Map<Long, LocalDateTime> lastReadMap = readStatusList.stream()
+                    .collect(Collectors.toMap(TaskReadStatus::getTaskId, TaskReadStatus::getLastReadTime));
+
+            // 定义一个 MySQL 可接受的最小日期（1970-01-01 00:00:00）
+            LocalDateTime DEFAULT_MIN_DATE = LocalDateTime.of(1970, 1, 1, 0, 0, 0);
+            for (TaskVO taskVO : records) {
+                LocalDateTime lastRead = lastReadMap.getOrDefault(taskVO.getId(), DEFAULT_MIN_DATE);
+                LambdaQueryWrapper<Comment> commentWrapper = new LambdaQueryWrapper<>();
+                commentWrapper.eq(Comment::getTaskId, taskVO.getId());
+                commentWrapper.gt(Comment::getCreateTime, lastRead);
+                Long unreadCount = commentMapper.selectCount(commentWrapper);
+                taskVO.setUnreadCount(unreadCount.intValue());
+            }
+        } else {
+            // 未登录或没有任务，设置未读数为 0
+            records.forEach(taskVO -> taskVO.setUnreadCount(0));
+        }
+
         result.setRecords(records);
         return result;
     }
@@ -271,29 +301,41 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
         return map;
     }
 
+    @Override
+    @Transactional
+    public void markTaskRead(Long taskId) {
+        Long userId = LoginUserContext.getUserId();
+        if (userId == null) return;
+        LambdaQueryWrapper<TaskReadStatus> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(TaskReadStatus::getUserId, userId).eq(TaskReadStatus::getTaskId, taskId);
+        TaskReadStatus record = taskReadStatusMapper.selectOne(wrapper);
+        if (record == null) {
+            record = new TaskReadStatus();
+            record.setUserId(userId);
+            record.setTaskId(taskId);
+            record.setLastReadTime(LocalDateTime.now());
+            taskReadStatusMapper.insert(record);
+        } else {
+            record.setLastReadTime(LocalDateTime.now());
+            taskReadStatusMapper.updateById(record);
+        }
+    }
+
     /**
      * 封装 TaskVO（支持多执行人）
      */
     private TaskVO buildTaskVO(Task task) {
         TaskVO vo = new TaskVO();
         BeanUtils.copyProperties(task, vo);
-
-        // 项目名称
         Project project = projectMapper.selectById(task.getProjectId());
-        if (project != null) {
-            vo.setProjectName(project.getName());
-        }
-        // 创建人名称
+        if (project != null) vo.setProjectName(project.getName());
         User creator = userMapper.selectById(task.getCreatorId());
-        if (creator != null) {
-            vo.setCreatorName(creator.getNickname());
-        }
+        if (creator != null) vo.setCreatorName(creator.getNickname());
 
         // 查询执行人列表
         LambdaQueryWrapper<TaskExecutor> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(TaskExecutor::getTaskId, task.getId());
         List<TaskExecutor> executors = taskExecutorMapper.selectList(wrapper);
-
         List<Long> executorIds = new ArrayList<>();
         List<String> executorNames = new ArrayList<>();
         for (TaskExecutor te : executors) {
@@ -305,7 +347,6 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
         }
         vo.setExecutorIds(executorIds);
         vo.setExecutorNames(executorNames);
-
         vo.setDeadline(task.getEndTime());
         vo.setCreatorId(task.getCreatorId());
         vo.setCreateTime(task.getCreateTime());

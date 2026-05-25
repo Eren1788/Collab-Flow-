@@ -30,7 +30,7 @@ public class TaskVO {
 
     private Long creatorId;    // 任务创建者ID，用于回复时确定接收人
 
-//    private Long executorId;
-
     private LocalDateTime createTime;
+
+    private Integer unreadCount;    //未读消息数
 }

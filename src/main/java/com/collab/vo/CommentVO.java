@@ -11,6 +11,16 @@ public class CommentVO {
     private Long id;
 
     /**
+     * 添加任务ID
+     */
+    private Long taskId;
+
+    /**
+     * 发送人用户ID
+     */
+    private Long userId;
+
+    /**
      * 评论内容
      */
     private String content;
@@ -34,5 +44,10 @@ public class CommentVO {
      * 评论时间
      */
     private String createTime;
+
+    /**
+     * 评论类型：TASK_COMMENT / PROJECT_COMMENT
+     */
+    private String type;
 
 }
