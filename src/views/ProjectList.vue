@@ -23,7 +23,14 @@
           <el-button type="primary" @click="loadProjectList">搜索</el-button>
         </div>
         <div class="right">
-          <el-button v-if="isSuperAdmin" type="primary" @click="openAddDialog">新增项目</el-button>
+          <!-- 只有超级管理员可见 -->
+          <el-button
+            v-if="isSuperAdmin"
+            type="primary"
+            @click="openAddDialog"
+          >
+            新增项目
+          </el-button>
         </div>
       </div>
     </el-card>
@@ -53,21 +60,38 @@
 
         <el-table-column prop="createTime" label="创建时间" width="180" />
 
-        <el-table-column label="操作" width="120" fixed="right" align="center">
+        <!-- 操作列：根据角色显示不同按钮 -->
+        <el-table-column label="操作" width="160" fixed="right" align="center">
           <template #default="scope">
+            <!-- 所有用户都能看到“详情”和“成员”按钮 -->
             <div class="action-buttons">
-              <el-button v-if="isSuperAdmin" type="primary" size="small" @click="handleEdit(scope.row)">编辑</el-button>
+              <el-button type="warning" size="small" @click="handleDetail(scope.row)">详情</el-button>
               <el-button type="success" size="small" @click="handleMember(scope.row)">成员</el-button>
             </div>
             <div class="action-buttons">
-              <el-button type="warning" size="small" @click="handleDetail(scope.row)">详情</el-button>
-              <el-button v-if="isSuperAdmin" type="danger" size="small" @click="handleDelete(scope.row.id)">删除</el-button>
+              <!-- 只有超级管理员可见编辑和删除 -->
+              <el-button
+                v-if="isSuperAdmin"
+                type="primary"
+                size="small"
+                @click="handleEdit(scope.row)"
+              >
+                编辑
+              </el-button>
+              <el-button
+                v-if="isSuperAdmin"
+                type="danger"
+                size="small"
+                @click="handleDelete(scope.row.id)"
+              >
+                删除
+              </el-button>
             </div>
           </template>
         </el-table-column>
       </el-table>
 
-      <!-- 分页：使用插槽自定义总条数显示为中文 -->
+      <!-- 分页 -->
       <div class="pagination">
         <el-pagination
           background
@@ -76,16 +100,16 @@
           :page-size="pageSize"
           :current-page="pageNum"
           @current-change="handlePageChange"
-        >
-          <template #total>
-            <span>共 {{ total }} 条</span>
-          </template>
-        </el-pagination>
+        />
       </div>
     </el-card>
 
-    <!-- 新增/编辑项目弹窗 -->
-    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑项目' : '新增项目'" width="600px">
+    <!-- 新增/编辑项目弹窗（仅超级管理员） -->
+    <el-dialog
+      v-model="dialogVisible"
+      :title="isEdit ? '编辑项目' : '新增项目'"
+      width="600px"
+    >
       <el-form :model="form" label-width="100px">
         <el-form-item label="项目名称">
           <el-input v-model="form.name" />
@@ -107,16 +131,25 @@
       </template>
     </el-dialog>
 
-    <!-- 项目成员弹窗 -->
-    <el-dialog v-model="memberDialogVisible" title="项目成员" width="600px">
-      <div class="member-toolbar" v-if="isSuperAdmin || isProjectManager">
-        <el-input v-model="memberForm.userId" placeholder="请输入用户ID" style="width:200px" />
+    <!-- 项目成员弹窗（所有用户可见，但普通成员无法添加/删除成员） -->
+    <el-dialog
+      v-model="memberDialogVisible"
+      title="项目成员"
+      width="600px"
+    >
+      <div class="member-toolbar" v-if="isSuperAdmin">
+        <el-input
+          v-model="memberForm.userId"
+          placeholder="请输入用户ID"
+          style="width:200px"
+        />
         <el-button type="primary" @click="addMember">添加成员</el-button>
       </div>
       <el-table :data="memberList" border stripe>
         <el-table-column prop="userId" label="用户ID" />
         <el-table-column prop="username" label="用户名" />
         <el-table-column prop="nickname" label="昵称" />
+        <!-- 删除按钮仅超级管理员可见 -->
         <el-table-column label="操作" width="120" v-if="isSuperAdmin">
           <template #default="scope">
             <el-button type="danger" size="small" @click="handleDeleteMember(scope.row.id)">删除</el-button>
@@ -137,15 +170,12 @@ import { useUserStore } from '../store/user'
 const router = useRouter()
 const userStore = useUserStore()
 
+// 判断当前用户是否是超级管理员
 const isSuperAdmin = computed(() => {
   const info = userStore.info
   return info?.roleId === 1 || info?.roleName === '超级管理员'
 })
-
-const isProjectManager = computed(() => {
-  const info = userStore.info
-  return info?.roleId === 2 || info?.roleName === '项目经理'
-})
+const currentUserId = computed(() => userStore.info?.id)
 
 const tableData = ref([])
 const total = ref(0)
@@ -171,17 +201,25 @@ const memberForm = reactive<any>({
   userId: ''
 })
 
+/**
+ * 加载项目列表（根据权限自动过滤）
+ */
 const loadProjectList = async () => {
   try {
+    const params: any = {
+      pageNum: pageNum.value,
+      pageSize: pageSize.value,
+      keyword: keyword.value,
+      status: status.value
+    }
+    // 非超级管理员只能看到自己参与的项目（后端需支持 memberId 参数）
+    if (!isSuperAdmin.value && currentUserId.value) {
+      params.memberId = currentUserId.value
+    }
     const res: any = await request({
       url: '/project/page',
       method: 'get',
-      params: {
-        pageNum: pageNum.value,
-        pageSize: pageSize.value,
-        keyword: keyword.value,
-        status: status.value
-      }
+      params
     })
     tableData.value = (res.data.records || []).map((item: any) => ({
       ...item,
@@ -193,23 +231,35 @@ const loadProjectList = async () => {
   }
 }
 
+/**
+ * 分页切换
+ */
 const handlePageChange = (page: number) => {
   pageNum.value = page
   loadProjectList()
 }
 
+/**
+ * 新增项目弹窗（仅管理员）
+ */
 const openAddDialog = () => {
   isEdit.value = false
   resetForm()
   dialogVisible.value = true
 }
 
+/**
+ * 编辑项目（仅管理员）
+ */
 const handleEdit = (row: any) => {
   isEdit.value = true
   Object.assign(form, row)
   dialogVisible.value = true
 }
 
+/**
+ * 提交新增/编辑
+ */
 const submitForm = async () => {
   try {
     if (isEdit.value) {
@@ -234,10 +284,9 @@ const submitForm = async () => {
   }
 }
 
-const handleDetail = (row: any) => {
-  router.push(`/project/detail/${row.id}`)
-}
-
+/**
+ * 删除项目（仅管理员）
+ */
 const handleDelete = (id: number) => {
   ElMessageBox.confirm('确认删除该项目吗？', '提示', { type: 'warning' }).then(async () => {
     await request({ url: `/project/delete/${id}`, method: 'delete' })
@@ -246,6 +295,16 @@ const handleDelete = (id: number) => {
   })
 }
 
+/**
+ * 项目详情（所有用户可见）
+ */
+const handleDetail = (row: any) => {
+  router.push(`/project/detail/${row.id}`)
+}
+
+/**
+ * 成员管理弹窗（所有用户可见，但非管理员不能添加/删除）
+ */
 const handleMember = async (row: any) => {
   currentProjectId.value = row.id
   memberForm.projectId = row.id
@@ -253,6 +312,9 @@ const handleMember = async (row: any) => {
   loadMemberList()
 }
 
+/**
+ * 成员列表
+ */
 const loadMemberList = async () => {
   const res: any = await request({
     url: `/project/member/list/${currentProjectId.value}`,
@@ -261,7 +323,14 @@ const loadMemberList = async () => {
   memberList.value = res.data || []
 }
 
+/**
+ * 添加成员（仅管理员）
+ */
 const addMember = async () => {
+  if (!isSuperAdmin.value) {
+    ElMessage.warning('只有管理员可以添加成员')
+    return
+  }
   await request({
     url: '/project/member/add',
     method: 'post',
@@ -272,6 +341,9 @@ const addMember = async () => {
   loadMemberList()
 }
 
+/**
+ * 删除成员（仅管理员）
+ */
 const handleDeleteMember = (id: number) => {
   ElMessageBox.confirm('确认删除该成员吗？', '提示', { type: 'warning' }).then(async () => {
     await request({ url: `/project/member/delete/${id}`, method: 'delete' })
@@ -280,6 +352,9 @@ const handleDeleteMember = (id: number) => {
   })
 }
 
+/**
+ * 重置表单
+ */
 const resetForm = () => {
   form.id = null
   form.name = ''
