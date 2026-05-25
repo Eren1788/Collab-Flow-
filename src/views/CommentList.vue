@@ -227,7 +227,7 @@ const onWebSocketMessage = (message: any) => {
   }
 }
 
-// 加载用户参与的项目列表
+// 加载用户参与的项目列表（不传 memberId，由后端根据角色自动过滤）
 const loadProjectList = async () => {
   loadingProjects.value = true
   try {
