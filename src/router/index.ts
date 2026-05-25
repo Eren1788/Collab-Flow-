@@ -64,6 +64,14 @@ const routes = [
       },
 
       /**
+       * 项目成员完成情况统计页
+       */
+      {
+        path:'project/statistics/:id',
+        component:() => import('../views/ProjectStatistics.vue')
+      },
+
+      /**
        * 任务管理
        */
       {

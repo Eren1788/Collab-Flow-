@@ -1,571 +1,276 @@
 <template>
-
   <div class="detail-container">
-
     <!-- 任务信息 -->
-
     <el-card shadow="never">
-
       <div class="header">
-
         <div>
-
-          <div class="title">
-            {{ taskInfo.title }}
-          </div>
-
-          <div class="content">
-            {{ taskInfo.content || '暂无描述' }}
-          </div>
-
+          <div class="title">{{ taskInfo.title }}</div>
+          <div class="content">{{ taskInfo.content || '暂无描述' }}</div>
         </div>
-
         <div class="right">
-
-          <el-tag
-            v-if="taskInfo.status === 0"
-            type="info"
-          >
-            待开始
-          </el-tag>
-
-          <el-tag
-            v-else-if="taskInfo.status === 1"
-            type="primary"
-          >
-            进行中
-          </el-tag>
-
-          <el-tag
-            v-else
-            type="success"
-          >
-            已完成
-          </el-tag>
-
+          <el-tag v-if="taskInfo.status === 0" type="info">待开始</el-tag>
+          <el-tag v-else-if="taskInfo.status === 1" type="primary">进行中</el-tag>
+          <el-tag v-else type="success">已完成</el-tag>
         </div>
-
       </div>
-
     </el-card>
 
-    <!-- 统计 -->
-
+    <!-- 统计数据 -->
     <div class="statistics">
-
       <el-card shadow="hover">
-
         <div class="label">优先级</div>
-
         <div class="value">
-
-          <el-tag
-            v-if="taskInfo.priority === 3"
-            type="danger"
-          >
-            高
-          </el-tag>
-
-          <el-tag
-            v-else-if="taskInfo.priority === 2"
-            type="warning"
-          >
-            中
-          </el-tag>
-
-          <el-tag v-else>
-            低
-          </el-tag>
-
+          <el-tag v-if="taskInfo.priority === 3" type="danger">高</el-tag>
+          <el-tag v-else-if="taskInfo.priority === 2" type="warning">中</el-tag>
+          <el-tag v-else>低</el-tag>
         </div>
-
       </el-card>
-
       <el-card shadow="hover">
-
         <div class="label">执行人</div>
-
-        <div class="value">
-          {{ taskInfo.executorName || '暂无' }}
-        </div>
-
+        <div class="value">{{ taskInfo.executorName || '未指派' }}</div>
       </el-card>
-
       <el-card shadow="hover">
-
+        <div class="label">创建人</div>
+        <div class="value">{{ taskInfo.creatorName || '-' }}</div>
+      </el-card>
+      <el-card shadow="hover">
         <div class="label">创建时间</div>
-
-        <div class="value">
-          {{ taskInfo.createTime || '-' }}
-        </div>
-
+        <div class="value">{{ formatDateTime(taskInfo.createTime) }}</div>
       </el-card>
-
       <el-card shadow="hover">
-
         <div class="label">截止时间</div>
-
-        <div class="value">
-          {{ taskInfo.endTime || '-' }}
-        </div>
-
+        <div class="value">{{ formatDateTime(taskInfo.deadline) }}</div>
       </el-card>
-
     </div>
 
-    <!-- 状态修改 -->
-
+    <!-- 任务文件区域 -->
     <el-card shadow="never">
-
-      <div class="status-toolbar">
-
-        <el-select
-          v-model="statusForm.status"
-          style="width:200px"
+      <template #header>
+        <div class="card-header">
+          <span>任务文件</span>
+          <span class="hint-text">完成后把文件上传进来</span>
+        </div>
+      </template>
+      <div class="file-upload">
+        <el-upload
+          :action="uploadUrl"
+          :headers="headers"
+          :data="{ taskId: taskId }"
+          multiple
+          :on-success="handleUploadSuccess"
+          :on-error="handleUploadError"
+          :before-upload="beforeUpload"
         >
-
-          <el-option label="待开始" :value="0" />
-
-          <el-option label="进行中" :value="1" />
-
-          <el-option label="已完成" :value="2" />
-
-        </el-select>
-
-        <el-button
-          type="primary"
-          @click="updateStatus"
-        >
-          修改状态
-        </el-button>
-
+          <el-button type="primary">上传文件</el-button>
+        </el-upload>
       </div>
-
+      <el-table :data="fileList" border stripe style="margin-top:20px">
+        <el-table-column prop="fileName" label="文件名" />
+        <el-table-column prop="fileSize" label="大小" width="120">
+          <template #default="scope">
+            {{ formatFileSize(scope.row.fileSize) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="uploadTime" label="上传时间" width="180" />
+        <el-table-column label="操作" width="180">
+          <template #default="scope">
+            <el-button link type="primary" @click="downloadFile(scope.row.id)">下载</el-button>
+            <el-button link type="danger" @click="deleteFile(scope.row.id)" v-if="canManage">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-empty v-if="fileList.length === 0" description="暂无文件" />
     </el-card>
-
-    <!-- Tabs -->
-
-    <el-card shadow="never">
-
-      <el-tabs v-model="activeTab">
-
-        <!-- 评论 -->
-
-        <el-tab-pane
-          label="任务评论"
-          name="comment"
-        >
-
-          <div class="comment-toolbar">
-
-            <el-input
-              v-model="commentContent"
-              type="textarea"
-              :rows="4"
-              placeholder="请输入评论内容"
-            />
-
-            <el-button
-              type="primary"
-              @click="submitComment"
-            >
-              发表评论
-            </el-button>
-
-          </div>
-
-          <div
-            v-for="item in commentList"
-            :key="item.id"
-            class="comment-item"
-          >
-
-            <div class="comment-user">
-              {{ item.username || '用户' }}
-            </div>
-
-            <div class="comment-content">
-              {{ item.content }}
-            </div>
-
-            <div class="comment-time">
-              {{ item.createTime }}
-            </div>
-
-          </div>
-
-          <el-empty
-            v-if="commentList.length === 0"
-            description="暂无评论"
-          />
-
-        </el-tab-pane>
-
-        <!-- 文件 -->
-
-        <el-tab-pane
-          label="任务文件"
-          name="file"
-        >
-
-          <el-upload
-            :action="uploadUrl"
-            :headers="headers"
-            :data="{ taskId }"
-            multiple
-            :on-success="handleUploadSuccess"
-          >
-
-            <el-button type="primary">
-              上传文件
-            </el-button>
-
-          </el-upload>
-
-          <el-table
-            :data="fileList"
-            border
-            stripe
-            style="margin-top:20px"
-          >
-
-            <el-table-column
-              prop="fileName"
-              label="文件名"
-            />
-
-            <el-table-column
-              prop="createTime"
-              label="上传时间"
-              width="180"
-            />
-
-            <el-table-column
-              label="操作"
-              width="120"
-            >
-
-              <template #default="scope">
-
-                <el-link
-                  type="primary"
-                  :href="scope.row.fileUrl"
-                  target="_blank"
-                >
-                  下载
-                </el-link>
-
-              </template>
-
-            </el-table-column>
-
-          </el-table>
-
-          <el-empty
-            v-if="fileList.length === 0"
-            description="暂无文件"
-          />
-
-        </el-tab-pane>
-
-      </el-tabs>
-
-    </el-card>
-
   </div>
-
 </template>
 
 <script setup lang="ts">
-
-import {
-
-  ref,
-  reactive,
-  onMounted
-
-} from 'vue'
-
-import {
-
-  useRoute
-
-} from 'vue-router'
-
-import {
-
-  ElMessage
-
-} from 'element-plus'
-
+import { ref, reactive, onMounted, computed } from 'vue'
+import { useRoute } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../utils/request'
+import { useUserStore } from '../store/user'
 
 const route = useRoute()
+const userStore = useUserStore()
+const taskId = Number(route.params.id)
 
-const taskId = route.params.id
-
-const activeTab = ref('comment')
-
-const taskInfo = reactive<any>({})
-
-const commentList = ref<any[]>([])
-
-const fileList = ref<any[]>([])
-
-const commentContent = ref('')
-
-const uploadUrl = 'http://localhost:8080/file/upload'
-
-const headers = {
-  Authorization:`Bearer ${localStorage.getItem('token')}`
-}
-
-const statusForm = reactive({
-  taskId:Number(taskId),
-  status:0
+// 权限判断（管理员或项目经理）
+const canManage = computed(() => {
+  const info = userStore.info
+  return info?.roleId === 1 || info?.roleName === '超级管理员' || info?.roleId === 2 || info?.roleName === '项目经理'
 })
 
-/**
- * 加载任务详情
- */
-const loadTaskDetail = async ()=>{
+// 任务信息
+const taskInfo = reactive<any>({
+  title: '',
+  content: '',
+  status: 0,
+  priority: 1,
+  executorName: '',
+  creatorName: '',
+  createTime: null,
+  deadline: null
+})
 
-  const res:any = await request({
+// 文件列表
+const fileList = ref<any[]>([])
 
-    url:`/task/detail/${taskId}`,
-
-    method:'get'
-  })
-
-  Object.assign(taskInfo,res.data)
-
-  statusForm.status = res.data.status
+// 上传配置
+const uploadUrl = '/api/file/upload'
+const headers = {
+  Authorization: `Bearer ${localStorage.getItem('token')}`
 }
 
-/**
- * 加载评论
- */
-const loadCommentList = async ()=>{
+// 辅助函数：格式化日期时间
+const formatDateTime = (dateTime: string) => {
+  if (!dateTime) return '暂无'
+  return dateTime.replace('T', ' ')
+}
 
-  try{
+// 辅助函数：格式化文件大小
+const formatFileSize = (size: number) => {
+  if (!size) return '-'
+  if (size < 1024) return size + ' B'
+  if (size < 1024 * 1024) return (size / 1024).toFixed(2) + ' KB'
+  return (size / (1024 * 1024)).toFixed(2) + ' MB'
+}
 
-    const res:any = await request({
-
-      url:`/comment/list/${taskId}`,
-
-      method:'get'
-    })
-
-    commentList.value = res.data || []
-
-  }catch(error){
-
-    commentList.value = []
+// 上传前校验
+const beforeUpload = (file: File) => {
+  const isLt20M = file.size / 1024 / 1024 < 20
+  if (!isLt20M) {
+    ElMessage.error('文件大小不能超过20MB')
+    return false
   }
+  return true
 }
 
-/**
- * 加载文件
- */
-const loadFileList = async ()=>{
+// 加载任务详情
+const loadTaskDetail = async () => {
+  const res: any = await request({ url: `/task/detail/${taskId}`, method: 'get' })
+  Object.assign(taskInfo, res.data)
+}
 
-  try{
-
-    const res:any = await request({
-
-      url:`/file/task/${taskId}`,
-
-      method:'get'
-    })
-
+// 加载文件列表
+const loadFileList = async () => {
+  try {
+    const res: any = await request({ url: '/file/list', method: 'get', params: { taskId } })
     fileList.value = res.data || []
-
-  }catch(error){
-
+  } catch (error) {
     fileList.value = []
   }
 }
 
-/**
- * 修改状态
- */
-const updateStatus = async ()=>{
-
-  await request({
-
-    url:'/task/status',
-
-    method:'put',
-
-    data:statusForm
-  })
-
-  ElMessage.success('状态修改成功')
-
-  loadTaskDetail()
-}
-
-/**
- * 发表评论
- */
-const submitComment = async ()=>{
-
-  if(!commentContent.value){
-
-    ElMessage.warning('请输入评论内容')
-
-    return
+// 上传成功回调
+const handleUploadSuccess = (res: any) => {
+  if (res.code === 200) {
+    ElMessage.success('上传成功')
+    loadFileList()
+  } else {
+    ElMessage.error(res.message || '上传失败')
   }
+}
 
-  await request({
+const handleUploadError = () => {
+  ElMessage.error('上传失败，请稍后重试')
+}
 
-    url:'/comment/add',
+// 删除文件
+const deleteFile = async (id: number) => {
+  try {
+    await ElMessageBox.confirm('确定删除该文件吗？', '提示', { type: 'warning' })
+    await request({ url: `/file/delete/${id}`, method: 'delete' })
+    ElMessage.success('删除成功')
+    loadFileList()
+  } catch (error) {
+    if (error !== 'cancel') ElMessage.error('删除失败')
+  }
+}
 
-    method:'post',
-
-    data:{
-      taskId:Number(taskId),
-      content:commentContent.value
+// 下载文件
+const downloadFile = async (id: number) => {
+  try {
+    const res = await request({
+      url: `/file/download/${id}`,
+      method: 'get',
+      responseType: 'blob'
+    })
+    const blob = new Blob([res.data])
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    const contentDisposition = res.headers['content-disposition']
+    let fileName = 'file'
+    if (contentDisposition) {
+      const match = contentDisposition.match(/filename\*=UTF-8''(.+)/)
+      if (match) fileName = decodeURIComponent(match[1])
+      else {
+        const match2 = contentDisposition.match(/filename="(.+)"/)
+        if (match2) fileName = match2[1]
+      }
     }
-  })
-
-  ElMessage.success('评论成功')
-
-  commentContent.value = ''
-
-  loadCommentList()
+    a.download = fileName
+    document.body.appendChild(a)
+    a.click()
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(a)
+  } catch (error) {
+    ElMessage.error('下载失败')
+  }
 }
 
-/**
- * 上传成功
- */
-const handleUploadSuccess = ()=>{
-
-  ElMessage.success('上传成功')
-
-  loadFileList()
-}
-
-onMounted(()=>{
-
+onMounted(() => {
   loadTaskDetail()
-
-  loadCommentList()
-
   loadFileList()
 })
-
 </script>
 
 <style scoped>
-
-.detail-container{
-
-  display:flex;
-
-  flex-direction:column;
-
-  gap:20px;
+.detail-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
-
-.header{
-
-  display:flex;
-
-  justify-content:space-between;
-
-  align-items:flex-start;
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
 }
-
-.title{
-
-  font-size:28px;
-
-  font-weight:bold;
-
-  margin-bottom:15px;
+.title {
+  font-size: 28px;
+  font-weight: bold;
+  margin-bottom: 15px;
 }
-
-.content{
-
-  color:#666;
-
-  line-height:28px;
+.content {
+  color: #666;
+  line-height: 28px;
 }
-
-.statistics{
-
-  display:grid;
-
-  grid-template-columns:repeat(4,1fr);
-
-  gap:20px;
+.statistics {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 20px;
 }
-
-.label{
-
-  color:#999;
-
-  margin-bottom:15px;
+.label {
+  color: #999;
+  margin-bottom: 15px;
 }
-
-.value{
-
-  font-size:20px;
-
-  font-weight:bold;
+.value {
+  font-size: 20px;
+  font-weight: bold;
 }
-
-.status-toolbar{
-
-  display:flex;
-
-  gap:15px;
-
-  align-items:center;
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
-
-.comment-toolbar{
-
-  display:flex;
-
-  flex-direction:column;
-
-  gap:15px;
-
-  margin-bottom:20px;
+.hint-text {
+  font-size: 12px;
+  color: #909399;
 }
-
-.comment-item{
-
-  border:1px solid #eee;
-
-  border-radius:8px;
-
-  padding:15px;
-
-  margin-bottom:15px;
+.file-upload {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
 }
-
-.comment-user{
-
-  font-weight:bold;
-
-  margin-bottom:10px;
-}
-
-.comment-content{
-
-  line-height:24px;
-
-  margin-bottom:10px;
-}
-
-.comment-time{
-
-  color:#999;
-
-  font-size:13px;
-}
-
 </style>

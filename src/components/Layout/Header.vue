@@ -12,7 +12,7 @@
     <div class="right-box">
 
       <!-- 通知中心 -->
-      <el-popover placement="bottom" :width="420" trigger="click">
+      <el-popover placement="bottom" :width="450" trigger="click">
         <template #reference>
           <div class="notification-box">
             <el-badge :value="unreadCount" :hidden="unreadCount === 0">
@@ -23,39 +23,53 @@
 
         <div class="notification-header">
           <span class="notification-title">通知中心</span>
-          <el-button link type="primary" @click="readAll">全部已读</el-button>
+          <div class="header-actions">
+            <!-- 更多按钮：切换编辑模式 -->
+            <el-button link type="primary" @click="toggleEditMode">
+              {{ editMode ? '取消' : '更多' }}
+            </el-button>
+            <!-- 编辑模式下的操作按钮 -->
+            <template v-if="editMode">
+              <el-button link type="primary" @click="toggleSelectAll">
+                {{ selectAll ? '取消全选' : '全选' }}
+              </el-button>
+              <el-button link type="danger" @click="deleteSelected" :disabled="selectedIds.length === 0">
+                删除选中
+              </el-button>
+            </template>
+            <el-button link type="primary" @click="readAll">全部已读</el-button>
+          </div>
         </div>
 
-        <!-- 通知列表（美化后） -->
+        <!-- 通知列表 -->
         <div v-if="notifications.length > 0" class="notification-list">
           <div
             v-for="item in notifications"
             :key="item.id"
             class="notification-item"
-            :class="{ unread: item.isRead === 0 }"
-            @click="readNotification(item)"
+            :class="{ unread: item.isRead === 0, selected: editMode && selectedIds.includes(item.id) }"
           >
-            <!-- 左侧头像 -->
+            <!-- 编辑模式下显示复选框 -->
+            <el-checkbox
+              v-if="editMode"
+              v-model="selectedIds"
+              :label="item.id"
+              @click.stop
+              class="select-checkbox"
+            />
             <div class="avatar-area">
               <el-avatar :size="40" :src="getAvatarUrl(item.avatar)">
                 <el-icon><User /></el-icon>
               </el-avatar>
             </div>
-            <!-- 右侧内容 -->
             <div class="content-area">
-              <!-- 发送人姓名 -->
               <div class="sender-name">{{ item.senderName || '系统' }}</div>
-              <!-- 项目+任务信息（移到姓名下方） -->
               <div v-if="item.taskTitle" class="task-info">
                 {{ item.projectName }} ｜ {{ item.taskTitle }}
               </div>
-              <!-- 消息内容（气泡样式） -->
               <div class="message-content">{{ formatMessage(item) }}</div>
-              <!-- 时间 -->
               <div class="notification-time">{{ item.createTime }}</div>
             </div>
-            <!-- 未读红点 -->
-            <div v-if="item.isRead === 0" class="unread-dot" />
           </div>
         </div>
         <el-empty v-else description="暂无通知" :image-size="80" />
@@ -124,11 +138,17 @@ const uploadLogo = async (options: any) => {
 // 通知相关
 const unreadCount = ref(0)
 const notifications = ref<any[]>([])
+const selectedIds = ref<number[]>([])
+const editMode = ref(false)   // 编辑模式开关
 
 const loadNotifications = async () => {
   try {
     const res: any = await request({ url: '/notification/my', method: 'get' })
     notifications.value = res.data || []
+    // 退出编辑模式时清空选中
+    if (!editMode.value) {
+      selectedIds.value = []
+    }
   } catch (error) {
     console.error(error)
   }
@@ -142,6 +162,8 @@ const loadUnreadCount = async () => {
   }
 }
 const readNotification = async (item: any) => {
+  // 编辑模式下点击消息不触发已读和跳转，只用于勾选
+  if (editMode.value) return
   try {
     if (item.isRead === 0) {
       await request({ url: `/notification/read/${item.id}`, method: 'put' })
@@ -165,6 +187,45 @@ const readAll = async () => {
     console.error(error)
   }
 }
+
+const toggleEditMode = () => {
+  editMode.value = !editMode.value
+  if (!editMode.value) {
+    selectedIds.value = []  // 退出编辑模式时清空选中
+  }
+}
+
+const selectAll = computed(() => {
+  return notifications.value.length > 0 && selectedIds.value.length === notifications.value.length
+})
+
+const toggleSelectAll = () => {
+  if (selectAll.value) {
+    selectedIds.value = []
+  } else {
+    selectedIds.value = notifications.value.map(item => item.id)
+  }
+}
+
+const deleteSelected = async () => {
+  if (selectedIds.value.length === 0) return
+  try {
+    await request({
+      url: '/notification/delete',
+      method: 'delete',
+      data: selectedIds.value
+    })
+    ElMessage.success(`已删除 ${selectedIds.value.length} 条通知`)
+    // 删除后退出编辑模式，刷新列表
+    editMode.value = false
+    selectedIds.value = []
+    loadNotifications()
+    loadUnreadCount()
+  } catch (error) {
+    ElMessage.error('删除失败')
+  }
+}
+
 const messageListener = () => {
   console.log('通知中心收到实时消息')
   loadNotifications()
@@ -176,7 +237,6 @@ const logout = () => {
   router.push('/login')
 }
 
-// 辅助函数
 const getAvatarUrl = (avatar: string) => {
   if (avatar && avatar.startsWith('/uploads')) {
     return `/api${avatar}?t=${Date.now()}`
@@ -271,13 +331,17 @@ onUnmounted(() => {
   font-size: 16px;
   font-weight: bold;
 }
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
 .notification-list {
   max-height: 420px;
   overflow-y: auto;
 }
 .notification-item {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   padding: 12px;
   border-radius: 8px;
   margin-bottom: 10px;
@@ -286,6 +350,7 @@ onUnmounted(() => {
   position: relative;
   transition: 0.3s;
   background: white;
+  align-items: flex-start;
 }
 .notification-item:hover {
   background: #f5f7fa;
@@ -293,6 +358,14 @@ onUnmounted(() => {
 .notification-item.unread {
   background: #ecf5ff;
   border-color: #409EFF;
+}
+.notification-item.selected {
+  background: #f0f9eb;
+  border-color: #67c23a;
+}
+.select-checkbox {
+  margin-top: 10px;
+  flex-shrink: 0;
 }
 .avatar-area {
   flex-shrink: 0;
@@ -313,7 +386,6 @@ onUnmounted(() => {
   margin-bottom: 6px;
   line-height: 1.4;
 }
-/* 消息内容的气泡样式 */
 .message-content {
   font-size: 13px;
   color: #333;
@@ -331,15 +403,6 @@ onUnmounted(() => {
   font-size: 11px;
   color: #bbb;
   margin-top: 2px;
-}
-.unread-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #f56c6c;
-  position: absolute;
-  right: 12px;
-  top: 18px;
 }
 .user-info {
   display: flex;
