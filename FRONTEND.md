@@ -20,6 +20,7 @@
 
 ```
 collab-flow-web/
+├── .gitignore                          # Git 忽略规则
 ├── index.html                          # 入口 HTML
 ├── package.json                        # 依赖与脚本
 ├── vite.config.ts                      # Vite 配置 (代理 /api → localhost:8080)
@@ -27,10 +28,19 @@ collab-flow-web/
 ├── tsconfig.app.json                   # 应用 TS 配置
 ├── tsconfig.node.json                  # 构建工具 TS 配置
 │
+├── public/                             # 公共静态资源
+│   ├── favicon.svg                     #   网站图标
+│   └── icons.svg                       #   图标集
+│
 └── src/
     ├── main.ts                         # 应用入口 (挂载 Vue/Pinia/Router/Element Plus)
     ├── App.vue                         # 根组件 (<router-view />, 恢复 WebSocket)
     ├── style.css                       # 全局样式
+    │
+    ├── assets/                         # 静态资源
+    │   ├── hero.png                    #   英雄图片
+    │   ├── vite.svg                    #   Vite 图标
+    │   └── vue.svg                     #   Vue 图标
     │
     ├── api/                            # API 服务层
     │   ├── user.ts                     #   用户 CRUD、登录、注册、头像上传
@@ -76,9 +86,9 @@ collab-flow-web/
 | 路径 | 页面 | 说明 |
 |------|------|------|
 | `/login` | Login.vue | 登录/注册页，未认证入口 |
-| `/home` | Home.vue | 主布局壳 (含侧边栏 + Header) |
-| `/user/list` | UserList.vue | 用户管理 |
-| `/project/list` | ProjectList.vue | 项目列表 |
+| `/` | Home.vue | 主布局壳 (含侧边栏 + Header)，默认重定向到 `/users` |
+| `/users` | UserList.vue | 用户管理 |
+| `/projects` | ProjectList.vue | 项目列表 |
 | `/project/detail/:id` | ProjectDetail.vue | 项目详情 |
 | `/project/statistics/:id` | ProjectStatistics.vue | 项目统计 |
 | `/tasks` | TaskList.vue | 全局任务列表 |
@@ -147,12 +157,12 @@ interface ApiResponse<T> {
 
 | 模块 | 主要接口 |
 |------|---------|
-| `user.ts` | login, register, getList, getById, update, delete, updateAvatar |
-| `project.ts` | getPage, getById, create, update, delete, getMembers, addMember |
-| `task.ts` | getPage, getById, create, update, delete, updateStatus |
-| `comment.ts` | getList (任务评论), getProjectComments, addTaskComment, addProjectComment |
-| `notification.ts` | getList, markAsRead, markAllAsRead, delete, getUnreadCount |
-| `logo.ts` | getLogo, uploadLogo |
+| `user.ts` | loginApi, registerApi, getUserListApi, getUserPageApi, getUserInfoApi, updateUserApi, deleteUserApi, updateUserStatusApi, getRoleListApi, uploadAvatarApi |
+| `project.ts` | getProjectPageApi, getProjectListApi, getProjectDetailApi, addProjectApi, updateProjectApi, deleteProjectApi, getProjectMemberListApi, addProjectMemberApi |
+| `task.ts` | getTaskPageApi, getTaskDetailApi, addTaskApi, updateTaskApi, deleteTaskApi, updateTaskStatusApi |
+| `comment.ts` | getCommentListApi (任务评论), addCommentApi, deleteCommentApi, getProjectCommentListApi, addProjectCommentApi, markTaskReadApi |
+| `notification.ts` | getMyNotifications, getUnreadCount, readNotification, readAllNotification |
+| `logo.ts` | getLogoUrlApi, uploadLogoApi |
 
 ---
 
