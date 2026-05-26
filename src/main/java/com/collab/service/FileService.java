@@ -27,4 +27,9 @@ public interface FileService
 
     ResponseEntity<Resource> download(Long id);
 
+    /**
+     * 获取当前用户有权限查看文件的项目列表（ID + 名称）
+     */
+    List<Map<String, Object>> getAccessibleProjects();
+
 }

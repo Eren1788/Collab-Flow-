@@ -20,6 +20,8 @@ public class TaskVO {
 
     private String projectName;
 
+    private Long projectId;     //项目ID，用于关联文件上传
+
     private String creatorName;
 
     private List<String> executorNames;   // 执行人昵称列表

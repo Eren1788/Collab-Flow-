@@ -8,6 +8,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
+import java.util.Map;
+
 @RestController
 @RequestMapping("/file")
 @RequiredArgsConstructor
@@ -76,6 +79,14 @@ public class FileController {
     ){
 
         return fileService.download(id);
+    }
+
+    /**
+     * 获取当前用户有权限查看文件的项目列表
+     */
+    @GetMapping("/project-list")
+    public Result<List<Map<String, Object>>> projectList() {
+        return Result.success(fileService.getAccessibleProjects());
     }
 
 }

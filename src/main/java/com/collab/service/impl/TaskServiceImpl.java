@@ -328,7 +328,10 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
         TaskVO vo = new TaskVO();
         BeanUtils.copyProperties(task, vo);
         Project project = projectMapper.selectById(task.getProjectId());
-        if (project != null) vo.setProjectName(project.getName());
+        if (project != null){
+            vo.setProjectName(project.getName());
+            vo.setProjectId(project.getId());
+        }
         User creator = userMapper.selectById(task.getCreatorId());
         if (creator != null) vo.setCreatorName(creator.getNickname());
 
