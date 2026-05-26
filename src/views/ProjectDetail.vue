@@ -53,7 +53,7 @@
         <el-descriptions-item label="用户名">{{ myProjectMember.username }}</el-descriptions-item>
         <el-descriptions-item label="昵称">{{ myProjectMember.nickname || '-' }}</el-descriptions-item>
         <el-descriptions-item label="项目角色">{{ myProjectMember.role || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="加入时间">{{ myProjectMember.joinTime || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="加入时间">{{ formatDateTime(myProjectMember.joinTime) }}</el-descriptions-item>
       </el-descriptions>
     </el-card>
 
@@ -69,7 +69,11 @@
         <el-table-column prop="username" label="用户名" />
         <el-table-column prop="nickname" label="昵称" />
         <el-table-column prop="role" label="项目角色" />
-        <el-table-column prop="joinTime" label="加入时间" width="180" />
+        <el-table-column label="加入时间" width="180">
+            <template #default="scope">
+              {{ formatDateTime(scope.row.joinTime) }}
+            </template>
+          </el-table-column>
       </el-table>
       <el-empty v-if="memberList.length === 0" description="暂无成员" />
     </el-card>
@@ -115,7 +119,7 @@
               </el-table-column>
               <el-table-column label="截止时间" width="180">
                 <template #default="scope">
-                  {{ scope.row.deadline ? scope.row.deadline.replace('T', ' ') : '' }}
+                  {{ formatDateTime(scope.row.deadline) }}
                 </template>
               </el-table-column>
               <el-table-column label="操作" width="280" fixed="right">
@@ -205,7 +209,7 @@
         <el-timeline-item
           v-for="item in displayActivityList"
           :key="item.id"
-          :timestamp="item.createTime"
+          :timestamp="formatDateTime(item.createTime)"
           placement="top"
         >
           <el-card>
@@ -414,6 +418,12 @@ const questionForm = reactive({
 const replyDialogVisible = ref(false)
 const replyTask = ref<any>(null)
 const replyContent = ref('')
+
+// 日期时间格式化
+const formatDateTime = (dateTime: string) => {
+  if (!dateTime) return '-'
+  return dateTime.replace('T', ' ')
+}
 
 // 动态折叠相关
 const showAllActivities = ref(false)

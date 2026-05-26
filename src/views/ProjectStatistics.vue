@@ -30,7 +30,11 @@
                   {{ formatFileSize(scope.row.fileSize) }}
                 </template>
               </el-table-column>
-              <el-table-column prop="uploadTime" label="上传时间" width="180" />
+              <el-table-column label="上传时间" width="180">
+                  <template #default="scope">
+                    {{ formatDateTime(scope.row.uploadTime) }}
+                  </template>
+                </el-table-column>
               <el-table-column label="操作" width="100">
                 <template #default="scope">
                   <el-button link type="primary" @click="downloadFile(scope.row.id)">下载</el-button>
@@ -65,6 +69,11 @@ const getAvatarUrl = (avatar: string) => {
   return ''
 }
 
+const formatDateTime = (dateTime: string) => {
+  if (!dateTime) return '-'
+  return dateTime.replace('T', ' ')
+}
+
 const formatFileSize = (size: number) => {
   if (!size) return '-'
   if (size < 1024) return size + ' B'
@@ -81,35 +90,8 @@ const loadStatistics = async () => {
   }
 }
 
-const downloadFile = async (id: number) => {
-  try {
-    const res = await request({
-      url: `/file/download/${id}`,
-      method: 'get',
-      responseType: 'blob'
-    })
-    const blob = new Blob([res.data])
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    const contentDisposition = res.headers['content-disposition']
-    let fileName = 'file'
-    if (contentDisposition) {
-      const match = contentDisposition.match(/filename\*=UTF-8''(.+)/)
-      if (match) fileName = decodeURIComponent(match[1])
-      else {
-        const match2 = contentDisposition.match(/filename="(.+)"/)
-        if (match2) fileName = match2[1]
-      }
-    }
-    a.download = fileName
-    document.body.appendChild(a)
-    a.click()
-    window.URL.revokeObjectURL(url)
-    document.body.removeChild(a)
-  } catch (error) {
-    ElMessage.error('下载失败')
-  }
+const downloadFile = (id: number) => {
+  window.open(`/api/file/download/${id}`)
 }
 
 onMounted(() => {

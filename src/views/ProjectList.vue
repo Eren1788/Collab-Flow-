@@ -58,7 +58,11 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="createTime" label="创建时间" width="180" />
+        <el-table-column label="创建时间" width="180">
+            <template #default="scope">
+              {{ formatDateTime(scope.row.createTime) }}
+            </template>
+          </el-table-column>
 
         <!-- 操作列：根据角色显示不同按钮 -->
         <el-table-column label="操作" width="160" fixed="right" align="center">
@@ -355,6 +359,12 @@ const handleDeleteMember = (id: number) => {
 /**
  * 重置表单
  */
+// ---- 日期时间格式化 ----
+const formatDateTime = (dateTime: string) => {
+  if (!dateTime) return '-'
+  return dateTime.replace('T', ' ')
+}
+
 const resetForm = () => {
   form.id = null
   form.name = ''

@@ -27,7 +27,13 @@
       </el-card>
       <el-card shadow="hover">
         <div class="label">执行人</div>
-        <div class="value">{{ taskInfo.executorName || '未指派' }}</div>
+        <div class="value">
+          <!-- 支持多执行人显示 -->
+          <span v-if="taskInfo.executorNames && taskInfo.executorNames.length">
+            {{ taskInfo.executorNames.join('、') }}
+          </span>
+          <span v-else>未指派</span>
+        </div>
       </el-card>
       <el-card shadow="hover">
         <div class="label">创建人</div>
@@ -53,25 +59,26 @@
       </template>
       <div class="file-upload">
         <el-upload
-          :action="uploadUrl"
-          :headers="headers"
-          :data="{ taskId: taskId }"
-          multiple
-          :on-success="handleUploadSuccess"
-          :on-error="handleUploadError"
+          :show-file-list="false"
+          :http-request="handleUpload"
           :before-upload="beforeUpload"
+          multiple
         >
           <el-button type="primary">上传文件</el-button>
         </el-upload>
       </div>
       <el-table :data="fileList" border stripe style="margin-top:20px">
-        <el-table-column prop="fileName" label="文件名" />
+        <el-table-column prop="name" label="文件名" min-width="200" />
         <el-table-column prop="fileSize" label="大小" width="120">
           <template #default="scope">
             {{ formatFileSize(scope.row.fileSize) }}
           </template>
         </el-table-column>
-        <el-table-column prop="uploadTime" label="上传时间" width="180" />
+        <el-table-column label="上传时间" width="180">
+          <template #default="scope">
+            {{ formatDateTime(scope.row.uploadTime) }}
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="180">
           <template #default="scope">
             <el-button link type="primary" @click="downloadFile(scope.row.id)">下载</el-button>
@@ -95,40 +102,30 @@ const route = useRoute()
 const userStore = useUserStore()
 const taskId = Number(route.params.id)
 
-// 权限判断（管理员或项目经理）
 const canManage = computed(() => {
   const info = userStore.info
   return info?.roleId === 1 || info?.roleName === '超级管理员' || info?.roleId === 2 || info?.roleName === '项目经理'
 })
 
-// 任务信息
 const taskInfo = reactive<any>({
   title: '',
   content: '',
   status: 0,
   priority: 1,
-  executorName: '',
+  executorNames: [],      // 改为数组
   creatorName: '',
   createTime: null,
-  deadline: null
+  deadline: null,
+  projectId: null         // 新增
 })
 
-// 文件列表
 const fileList = ref<any[]>([])
 
-// 上传配置
-const uploadUrl = '/api/file/upload'
-const headers = {
-  Authorization: `Bearer ${localStorage.getItem('token')}`
-}
-
-// 辅助函数：格式化日期时间
 const formatDateTime = (dateTime: string) => {
   if (!dateTime) return '暂无'
   return dateTime.replace('T', ' ')
 }
 
-// 辅助函数：格式化文件大小
 const formatFileSize = (size: number) => {
   if (!size) return '-'
   if (size < 1024) return size + ' B'
@@ -136,7 +133,6 @@ const formatFileSize = (size: number) => {
   return (size / (1024 * 1024)).toFixed(2) + ' MB'
 }
 
-// 上传前校验
 const beforeUpload = (file: File) => {
   const isLt20M = file.size / 1024 / 1024 < 20
   if (!isLt20M) {
@@ -146,13 +142,11 @@ const beforeUpload = (file: File) => {
   return true
 }
 
-// 加载任务详情
 const loadTaskDetail = async () => {
   const res: any = await request({ url: `/task/detail/${taskId}`, method: 'get' })
   Object.assign(taskInfo, res.data)
 }
 
-// 加载文件列表
 const loadFileList = async () => {
   try {
     const res: any = await request({ url: '/file/list', method: 'get', params: { taskId } })
@@ -162,21 +156,34 @@ const loadFileList = async () => {
   }
 }
 
-// 上传成功回调
-const handleUploadSuccess = (res: any) => {
-  if (res.code === 200) {
-    ElMessage.success('上传成功')
-    loadFileList()
-  } else {
-    ElMessage.error(res.message || '上传失败')
+// 上传文件（传递 projectId）
+const handleUpload = async (options: any) => {
+  if (!taskInfo.projectId) {
+    ElMessage.warning('无法获取项目信息，请刷新页面后重试')
+    return
+  }
+  const formData = new FormData()
+  formData.append('file', options.file)
+  formData.append('taskId', String(taskId))
+  formData.append('projectId', String(taskInfo.projectId))
+  try {
+    const res: any = await request({
+      url: '/file/upload',
+      method: 'post',
+      data: formData,
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    if (res.code === 200) {
+      ElMessage.success('上传成功')
+      loadFileList()
+    } else {
+      ElMessage.error(res.message || '上传失败')
+    }
+  } catch (error) {
+    ElMessage.error('上传失败，请稍后重试')
   }
 }
 
-const handleUploadError = () => {
-  ElMessage.error('上传失败，请稍后重试')
-}
-
-// 删除文件
 const deleteFile = async (id: number) => {
   try {
     await ElMessageBox.confirm('确定删除该文件吗？', '提示', { type: 'warning' })
@@ -188,7 +195,7 @@ const deleteFile = async (id: number) => {
   }
 }
 
-// 下载文件
+// 修改下载方法：使用 axios 携带 token，避免 401
 const downloadFile = async (id: number) => {
   try {
     const res = await request({
@@ -198,25 +205,22 @@ const downloadFile = async (id: number) => {
     })
     const blob = new Blob([res.data])
     const url = window.URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
+    const link = document.createElement('a')
+    // 从响应头获取文件名，若无则使用默认名
     const contentDisposition = res.headers['content-disposition']
-    let fileName = 'file'
+    let fileName = 'download'
     if (contentDisposition) {
-      const match = contentDisposition.match(/filename\*=UTF-8''(.+)/)
-      if (match) fileName = decodeURIComponent(match[1])
-      else {
-        const match2 = contentDisposition.match(/filename="(.+)"/)
-        if (match2) fileName = match2[1]
-      }
+      const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)
+      if (match && match[1]) fileName = decodeURIComponent(match[1].replace(/['"]/g, ''))
     }
-    a.download = fileName
-    document.body.appendChild(a)
-    a.click()
+    link.href = url
+    link.download = fileName
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
     window.URL.revokeObjectURL(url)
-    document.body.removeChild(a)
   } catch (error) {
-    ElMessage.error('下载失败')
+    ElMessage.error('下载失败，请稍后重试')
   }
 }
 
