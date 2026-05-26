@@ -22,6 +22,7 @@ Collab Flow 是一个**企业级任务协作管理平台**后端系统，功能�
 | Lombok | 代码简化 |
 | Hutool | 5.8.26 (工具类) |
 | Fastjson2 | 2.0.52 |
+| Spring Validation | spring-boot-starter-validation (参数校验) |
 | Maven | 构建工具 |
 
 **系统功能：**
@@ -324,7 +325,7 @@ src/main/resources/
 | id | BIGINT | 主键，自增 |
 | permission_name | VARCHAR(50) | 权限名称 |
 | permission_code | VARCHAR(50) | 权限编码（如 user:list, task:add） |
-| type | VARCHAR(20) | 类型 |
+| type | TINYINT | 类型（权限类型编码） |
 | path | VARCHAR(255) | 路径 |
 
 ### 3.14 用户-角色关联表 `user_role`
@@ -366,7 +367,7 @@ src/main/resources/
 **放行白名单**（无需登录）：
 - `/user/login`、`/user/register`
 - `/logo/url`、`/logo/image`
-- `/doc.html`、`/swagger-ui/**`、`/v3/api-docs/**`
+- `/doc.html`、`/swagger-ui/**`、`/swagger-resources/**`、`/v3/api-docs/**`、`/webjars/**`
 - `/error`、`/uploads/**`
 
 **JWT 参数：**
@@ -405,10 +406,10 @@ src/main/resources/
 
 通过 `PermissionMapper.xml` 中的 `getPermissionCodesByUserId` 一次性查询用户的全部权限编码：
 ```sql
-SELECT DISTINCT p.permission_code
+SELECT p.permission_code
 FROM user_role ur
-JOIN role_permission rp ON ur.role_id = rp.role_id
-JOIN permission p ON rp.permission_id = p.id
+LEFT JOIN role_permission rp ON ur.role_id = rp.role_id
+LEFT JOIN permission p ON rp.permission_id = p.id
 WHERE ur.user_id = #{userId}
 ```
 
@@ -482,6 +483,7 @@ public class Result<T> {
 {
   "id": 1,
   "nickname": "新昵称",
+  "avatar": "/uploads/avatar/1.png",
   "email": "new@example.com",
   "phone": "13900139000",
   "status": 1,
@@ -584,6 +586,7 @@ public class Result<T> {
 | `/file/list` | GET | 文件列表（按 taskId 或 projectId 过滤） |
 | `/file/delete/{id}` | DELETE | 删除文件（物理文件 + 数据库记录） |
 | `/file/download/{id}` | GET | 下载文件（Content-Disposition: attachment） |
+| `/file/project-list` | GET | 获取有权限查看文件的项目列表（管理员全部，普通用户仅参与的项目） |
 
 **上传参数：**
 | 参数 | 类型 | 必填 |
