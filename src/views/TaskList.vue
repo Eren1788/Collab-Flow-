@@ -82,7 +82,15 @@
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="title" label="任务标题" min-width="200" />
         <el-table-column prop="projectName" label="所属项目" width="180" />
-        <el-table-column prop="executorName" label="执行人" width="140" />
+        <!-- 修改执行人列：支持多执行人显示 -->
+        <el-table-column label="执行人" width="160">
+          <template #default="scope">
+            <span v-if="scope.row.executorNames && scope.row.executorNames.length">
+              {{ scope.row.executorNames.join('、') }}
+            </span>
+            <span v-else>未指派</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="priority" label="优先级" width="120">
           <template #default="scope">
             <el-tag v-if="scope.row.priority === 3" type="danger">高</el-tag>
@@ -135,12 +143,12 @@ import request from '../utils/request'
 import { getTaskPageApi } from '../api/task'
 import { useUserStore } from '../store/user'
 
-// 定义任务数据类型
+// 定义任务数据类型（扩展 executorNames）
 interface TaskItem {
   id: number
   title: string
   projectName: string
-  executorName: string
+  executorNames?: string[]   // 改为数组
   priority: number
   status: number
   deadline: string | null
