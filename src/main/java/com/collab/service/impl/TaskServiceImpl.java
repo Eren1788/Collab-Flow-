@@ -17,6 +17,7 @@ import com.collab.dto.TaskStatusDTO;
 import com.collab.service.TaskService;
 import com.collab.vo.TaskVO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +27,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements TaskService {
@@ -172,17 +174,31 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateTask(TaskDTO dto) {
-        // 1. 更新任务基本信息
+        // 1. 查询原有任务信息，获取旧执行人列表
+        Task oldTask = taskMapper.selectById(dto.getId());
+        if (oldTask == null) {
+            throw new BusinessException("任务不存在");
+        }
+        LambdaQueryWrapper<TaskExecutor> oldWrapper = new LambdaQueryWrapper<>();
+        oldWrapper.eq(TaskExecutor::getTaskId, dto.getId());
+        List<TaskExecutor> oldExecutors = taskExecutorMapper.selectList(oldWrapper);
+        Set<Long> oldExecutorIds = oldExecutors.stream()
+                .map(TaskExecutor::getUserId)
+                .collect(Collectors.toSet());
+
+        // 2. 更新任务基本信息
         Task task = new Task();
         BeanUtils.copyProperties(dto, task);
         taskMapper.updateById(task);
 
-        // 2. 更新执行人关联：先删除旧的，再插入新的
+        // 3. 更新执行人关联：先删除旧的，再插入新的
         LambdaQueryWrapper<TaskExecutor> delWrapper = new LambdaQueryWrapper<>();
         delWrapper.eq(TaskExecutor::getTaskId, dto.getId());
         taskExecutorMapper.delete(delWrapper);
 
+        Set<Long> newExecutorIds = new HashSet<>();
         if (dto.getExecutorIds() != null && !dto.getExecutorIds().isEmpty()) {
+            newExecutorIds.addAll(dto.getExecutorIds());
             for (Long userId : dto.getExecutorIds()) {
                 TaskExecutor te = new TaskExecutor();
                 te.setTaskId(dto.getId());
@@ -191,8 +207,21 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
             }
         }
 
-        // 3. 可选：给新执行人发送通知（这里简化，只更新关联）
-        // 如需发送通知，可对比新旧执行人列表，此处略
+        // 4. 识别新增的执行人（新列表中有，旧列表中没有的）
+        Set<Long> addedExecutorIds = new HashSet<>(newExecutorIds);
+        addedExecutorIds.removeAll(oldExecutorIds);
+
+        // 5. 给新增的执行人发送通知
+        if (!addedExecutorIds.isEmpty()) {
+            String content = "你被指派了新任务：" + task.getTitle();
+            Long currentUserId = LoginUserContext.getUserId();
+            for (Long executorId : addedExecutorIds) {
+                notificationService.saveNotification(executorId, currentUserId, "TASK_ASSIGN", content, task.getId());
+                NotificationMessage message = new NotificationMessage("TASK_ASSIGN", content, task.getId(), System.currentTimeMillis());
+                NotificationWebSocketHandler.sendMessage(executorId, message);
+                log.info("编辑任务时发送指派通知给 userId={}, taskId={}", executorId, task.getId());
+            }
+        }
     }
 
     @Override
@@ -223,9 +252,11 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
 
     @Override
     public void assignTask(TaskAssignDTO dto) {
-        // 此方法仍用于单个指派，但建议改用多执行人方式。此处保留原逻辑（操作 task_executor 表）
+        log.info("=== 指派任务开始 ===");
+        log.info("taskId={}, executorId={}", dto.getTaskId(), dto.getExecutorId());
         Task task = taskMapper.selectById(dto.getTaskId());
         if (task == null) {
+            log.error("任务不存在, taskId={}", dto.getTaskId());
             throw new BusinessException("任务不存在");
         }
         // 清除原有执行人，添加新的单个执行人
@@ -238,9 +269,12 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
         taskExecutorMapper.insert(te);
 
         String content = "你被指派了新任务：" + task.getTitle();
+        log.info("准备保存通知: receiverId={}, senderId={}, content={}", dto.getExecutorId(), LoginUserContext.getUserId(), content);
         notificationService.saveNotification(dto.getExecutorId(), LoginUserContext.getUserId(), "TASK_ASSIGN", content, task.getId());
         NotificationMessage message = new NotificationMessage("TASK_ASSIGN", content, task.getId(), System.currentTimeMillis());
+        log.info("准备发送WebSocket消息给 userId={}", dto.getExecutorId());
         NotificationWebSocketHandler.sendMessage(dto.getExecutorId(), message);
+        log.info("=== 指派任务完成 ===");
     }
 
     @Override
