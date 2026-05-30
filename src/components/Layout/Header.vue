@@ -1,17 +1,12 @@
 <template>
   <el-header height="60px" class="header">
-
-    <!-- Logo区域 -->
     <div class="logo-area">
       <img :src="logoUrl" class="logo-img" alt="Logo" @error="handleLogoError">
       <el-upload v-if="isSuperAdmin" :show-file-list="false" :before-upload="beforeUpload" :http-request="uploadLogo" accept="image/png, image/jpeg, image/jpg" class="logo-upload">
         <el-icon class="edit-icon"><Edit /></el-icon>
       </el-upload>
     </div>
-
     <div class="right-box">
-
-      <!-- 通知中心 -->
       <el-popover placement="bottom" :width="450" trigger="click">
         <template #reference>
           <div class="notification-box">
@@ -20,53 +15,32 @@
             </el-badge>
           </div>
         </template>
-
         <div class="notification-header">
           <span class="notification-title">通知中心</span>
           <div class="header-actions">
-            <!-- 更多按钮：切换编辑模式 -->
-            <el-button link type="primary" @click="toggleEditMode">
-              {{ editMode ? '取消' : '更多' }}
-            </el-button>
-            <!-- 编辑模式下的操作按钮 -->
+            <el-button link type="primary" @click="toggleEditMode">{{ editMode ? '取消' : '更多' }}</el-button>
             <template v-if="editMode">
-              <el-button link type="primary" @click="toggleSelectAll">
-                {{ selectAll ? '取消全选' : '全选' }}
-              </el-button>
-              <el-button link type="danger" @click="deleteSelected" :disabled="selectedIds.length === 0">
-                删除选中
-              </el-button>
+              <el-button link type="primary" @click="toggleSelectAll">{{ selectAll ? '取消全选' : '全选' }}</el-button>
+              <el-button link type="danger" @click="deleteSelected" :disabled="selectedIds.length === 0">删除选中</el-button>
             </template>
             <el-button link type="primary" @click="readAll">全部已读</el-button>
           </div>
         </div>
-
-        <!-- 通知列表 -->
         <div v-if="notifications.length > 0" class="notification-list">
           <div
             v-for="item in notifications"
             :key="item.id"
             class="notification-item"
             :class="{ unread: item.isRead === 0, selected: editMode && selectedIds.includes(item.id) }"
+            @click="editMode ? null : readNotification(item)"
           >
-            <!-- 编辑模式下显示复选框 -->
-            <el-checkbox
-              v-if="editMode"
-              v-model="selectedIds"
-              :label="item.id"
-              @click.stop
-              class="select-checkbox"
-            />
+            <el-checkbox v-if="editMode" v-model="selectedIds" :label="item.id" @click.stop class="select-checkbox" />
             <div class="avatar-area">
-              <el-avatar :size="40" :src="getAvatarUrl(item.avatar)">
-                <el-icon><User /></el-icon>
-              </el-avatar>
+              <el-avatar :size="40" :src="getAvatarUrl(item.avatar)"><el-icon><User /></el-icon></el-avatar>
             </div>
             <div class="content-area">
               <div class="sender-name">{{ item.senderName || '系统' }}</div>
-              <div v-if="item.taskTitle" class="task-info">
-                {{ item.projectName }} ｜ {{ item.taskTitle }}
-              </div>
+              <div v-if="item.taskTitle" class="task-info">{{ item.projectName }} ｜ {{ item.taskTitle }}</div>
               <div class="message-content">{{ formatMessage(item) }}</div>
               <div class="notification-time">{{ item.createTime }}</div>
             </div>
@@ -74,8 +48,6 @@
         </div>
         <el-empty v-else description="暂无通知" :image-size="80" />
       </el-popover>
-
-      <!-- 退出 -->
       <div class="user-info">
         <el-button type="danger" plain size="small" @click="logout">退出</el-button>
       </div>
@@ -139,16 +111,13 @@ const uploadLogo = async (options: any) => {
 const unreadCount = ref(0)
 const notifications = ref<any[]>([])
 const selectedIds = ref<number[]>([])
-const editMode = ref(false)   // 编辑模式开关
+const editMode = ref(false)
 
 const loadNotifications = async () => {
   try {
     const res: any = await request({ url: '/notification/my', method: 'get' })
     notifications.value = res.data || []
-    // 退出编辑模式时清空选中
-    if (!editMode.value) {
-      selectedIds.value = []
-    }
+    if (!editMode.value) selectedIds.value = []
   } catch (error) {
     console.error(error)
   }
@@ -162,8 +131,6 @@ const loadUnreadCount = async () => {
   }
 }
 const readNotification = async (item: any) => {
-  // 编辑模式下点击消息不触发已读和跳转，只用于勾选
-  if (editMode.value) return
   try {
     if (item.isRead === 0) {
       await request({ url: `/notification/read/${item.id}`, method: 'put' })
@@ -187,36 +154,22 @@ const readAll = async () => {
     console.error(error)
   }
 }
-
 const toggleEditMode = () => {
   editMode.value = !editMode.value
-  if (!editMode.value) {
-    selectedIds.value = []  // 退出编辑模式时清空选中
-  }
+  if (!editMode.value) selectedIds.value = []
 }
-
 const selectAll = computed(() => {
   return notifications.value.length > 0 && selectedIds.value.length === notifications.value.length
 })
-
 const toggleSelectAll = () => {
-  if (selectAll.value) {
-    selectedIds.value = []
-  } else {
-    selectedIds.value = notifications.value.map(item => item.id)
-  }
+  if (selectAll.value) selectedIds.value = []
+  else selectedIds.value = notifications.value.map(item => item.id)
 }
-
 const deleteSelected = async () => {
   if (selectedIds.value.length === 0) return
   try {
-    await request({
-      url: '/notification/delete',
-      method: 'delete',
-      data: selectedIds.value
-    })
+    await request({ url: '/notification/delete', method: 'delete', data: selectedIds.value })
     ElMessage.success(`已删除 ${selectedIds.value.length} 条通知`)
-    // 删除后退出编辑模式，刷新列表
     editMode.value = false
     selectedIds.value = []
     loadNotifications()
@@ -226,11 +179,13 @@ const deleteSelected = async () => {
   }
 }
 
+// 实时消息回调：重新拉取通知列表
 const messageListener = () => {
-  console.log('通知中心收到实时消息')
+  console.log('通知中心收到实时消息，刷新列表')
   loadNotifications()
   loadUnreadCount()
 }
+
 const logout = () => {
   userStore.logout()
   ElMessage.success('已退出')
@@ -261,14 +216,65 @@ const formatMessage = (item: any) => {
   return content
 }
 
+// 确保 WebSocket 连接
+const ensureWebSocket = () => {
+  if (userStore.info?.id) {
+    websocket.connect(userStore.info.id)
+  }
+}
+
+// ========== 方案一：轮询机制 ==========
+let pollingTimer: ReturnType<typeof setInterval> | null = null
+let visibilityTimer: ReturnType<typeof setTimeout> | null = null
+
+const startPolling = () => {
+  if (pollingTimer) clearInterval(pollingTimer)
+  pollingTimer = setInterval(() => {
+    // 仅当页面可见且已登录时才拉取，减少无效请求
+    if (document.visibilityState === 'visible' && userStore.token) {
+      loadNotifications()
+      loadUnreadCount()
+    }
+  }, 30000) // 30秒
+}
+
+const stopPolling = () => {
+  if (pollingTimer) {
+    clearInterval(pollingTimer)
+    pollingTimer = null
+  }
+}
+
+// 页面可见性变化时立即拉取一次
+const handleVisibilityChange = () => {
+  if (document.visibilityState === 'visible' && userStore.token) {
+    // 延迟一点点，避免频繁请求
+    if (visibilityTimer) clearTimeout(visibilityTimer)
+    visibilityTimer = setTimeout(() => {
+      loadNotifications()
+      loadUnreadCount()
+    }, 200)
+  }
+}
+// ===================================
+
 onMounted(() => {
   fetchLogoUrl()
   loadNotifications()
   loadUnreadCount()
+  ensureWebSocket()
   websocket.addMessageListener(messageListener)
+  
+  // 启动轮询和监听页面可见性
+  startPolling()
+  document.addEventListener('visibilitychange', handleVisibilityChange)
 })
+
 onUnmounted(() => {
   websocket.removeMessageListener(messageListener)
+  stopPolling()
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+  if (visibilityTimer) clearTimeout(visibilityTimer)
 })
 </script>
 

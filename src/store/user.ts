@@ -1,43 +1,37 @@
 import { defineStore } from 'pinia'
-
 import websocket from '../utils/websocket'
 
 export const useUserStore = defineStore('user', {
-
   state: () => ({
     token: localStorage.getItem('token') || '',
     info: JSON.parse(localStorage.getItem('userInfo') || '{}')
   }),
-
   getters: {
-    //新增 hasPermission getter
     hasPermission: (state) => {
       return (permission: string): boolean => {
-        return Array.isArray(state.info?.permissions) && 
-               state.info.permissions.includes(permission)
+        return Array.isArray(state.info?.permissions) && state.info.permissions.includes(permission)
       }
     }
   },
-
   actions: {
-    // ... 原有 actions 不变
-    setToken(token: string){
+    setToken(token: string) {
       this.token = token
       localStorage.setItem('token', token)
     },
-
-    setUserInfo(info: any){
+    setUserInfo(info: any) {
       this.info = info
       localStorage.setItem('userInfo', JSON.stringify(info))
+      // 用户信息设置后，如果已登录则建立WebSocket连接
+      if (info?.id) {
+        this.connectWebSocket()
+      }
     },
-
-    connectWebSocket(){
-      if(this.info?.id){
+    connectWebSocket() {
+      if (this.info?.id) {
         websocket.connect(this.info.id)
       }
     },
-
-    logout(){
+    logout() {
       this.token = ''
       this.info = {}
       localStorage.removeItem('token')
