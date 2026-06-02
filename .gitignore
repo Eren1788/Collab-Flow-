@@ -1,2 +1,28 @@
-# Project exclude paths
-/target/
+# Java
+target/
+*.class
+*.jar
+*.war
+*.log
+hs_err_pid*.log
+
+# IDE
+.idea/
+*.iml
+.settings/
+.project
+.classpath
+.vscode/
+
+# Maven
+.mvn/
+
+# Frontend
+node_modules/
+dist/
+.vite/
+*.local
+
+# OS
+.DS_Store
+Thumbs.db

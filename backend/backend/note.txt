@@ -1,0 +1,32 @@
+Entity:对应数据库
+用于：
+     MyBatis
+     数据库映射
+特点：
+    字段完整
+    包括：
+    password
+    createTime
+    updateTime
+
+DTO:前端传给后端的数据
+特点：
+    只接收需要的字段
+    例如：
+    登录：
+
+    {
+      "username":"admin",
+      "password":"123456"
+    }
+
+    没必要传：
+    createTime
+    role
+    updateTime
+
+VO:后端返回给前端的数据
+特点：
+    隐藏敏感字段
+    例如：
+    password 不返回
