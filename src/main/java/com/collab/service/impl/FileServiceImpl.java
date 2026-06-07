@@ -13,7 +13,11 @@ import com.collab.mapper.ProjectMapper;
 import com.collab.mapper.ProjectMemberMapper;
 import com.collab.mapper.UserMapper;
 import com.collab.mapper.UserRoleMapper;
+import com.collab.entity.ProjectActivity;
+import com.collab.entity.Task;
+import com.collab.mapper.TaskMapper;
 import com.collab.service.FileService;
+import com.collab.service.ProjectActivityService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -42,6 +46,8 @@ public class FileServiceImpl extends ServiceImpl<FileInfoMapper, FileInfo> imple
     private final ProjectMapper projectMapper;
     private final ProjectMemberMapper projectMemberMapper;
     private final UserRoleMapper userRoleMapper;
+    private final ProjectActivityService projectActivityService;
+    private final TaskMapper taskMapper;
 
     @Value("${file.upload-path}")
     private String uploadPath;
@@ -147,6 +153,28 @@ public class FileServiceImpl extends ServiceImpl<FileInfoMapper, FileInfo> imple
             fileInfo.setUploaderId(LoginUserContext.getUserId());
 
             fileInfoMapper.insert(fileInfo);
+
+            // 项目动态：上传文件
+            try {
+                ProjectActivity activity = new ProjectActivity();
+                if (taskId != null) {
+                    activity.setProjectId(projectId);
+                    Task task = taskMapper.selectById(taskId);
+                    if (task != null) {
+                        activity.setContent("上传了文件：" + originalFilename + "（任务：" + task.getTitle() + "）");
+                    } else {
+                        activity.setContent("上传了文件：" + originalFilename);
+                    }
+                } else {
+                    activity.setProjectId(projectId);
+                    activity.setContent("上传了文件：" + originalFilename);
+                }
+                activity.setUserId(LoginUserContext.getUserId());
+                activity.setType("FILE_UPLOAD");
+                projectActivityService.addActivity(activity);
+            } catch (Exception e) {
+                log.error("记录项目动态失败", e);
+            }
 
             Map<String, Object> map = new HashMap<>();
 

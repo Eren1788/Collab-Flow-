@@ -207,9 +207,34 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
             }
         }
 
-        // 4. 识别新增的执行人（新列表中有，旧列表中没有的）
+        // 4. 识别新增/移除的执行人
         Set<Long> addedExecutorIds = new HashSet<>(newExecutorIds);
         addedExecutorIds.removeAll(oldExecutorIds);
+        Set<Long> removedExecutorIds2 = new HashSet<>(oldExecutorIds);
+        removedExecutorIds2.removeAll(newExecutorIds);
+
+        // 项目动态：执行人变化
+        StringBuilder activityContent = new StringBuilder("更新了任务「" + task.getTitle() + "」");
+        if (!addedExecutorIds.isEmpty()) {
+            List<String> addNames = addedExecutorIds.stream()
+                .map(id -> { User u = userMapper.selectById(id); return u != null ? (u.getNickname() != null ? u.getNickname() : u.getUsername()) : "未知"; })
+                .collect(Collectors.toList());
+            activityContent.append("，新增执行人：" + String.join("、", addNames));
+        }
+        if (!removedExecutorIds2.isEmpty()) {
+            List<String> rmNames = removedExecutorIds2.stream()
+                .map(id -> { User u = userMapper.selectById(id); return u != null ? (u.getNickname() != null ? u.getNickname() : u.getUsername()) : "未知"; })
+                .collect(Collectors.toList());
+            activityContent.append("，移除执行人：" + String.join("、", rmNames));
+        }
+        if (!addedExecutorIds.isEmpty() || !removedExecutorIds2.isEmpty()) {
+            ProjectActivity act = new ProjectActivity();
+            act.setProjectId(task.getProjectId());
+            act.setUserId(LoginUserContext.getUserId());
+            act.setType("TASK_UPDATE");
+            act.setContent(activityContent.toString());
+            projectActivityService.addActivity(act);
+        }
 
         // 5. 给新增的执行人发送通知
         if (!addedExecutorIds.isEmpty()) {
@@ -222,17 +247,58 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
                 log.info("编辑任务时发送指派通知给 userId={}, taskId={}", executorId, task.getId());
             }
         }
+
+        // 6. 识别被移除的执行人（旧列表中有，新列表中没有的）
+        Set<Long> removedExecutorIds = new HashSet<>(oldExecutorIds);
+        removedExecutorIds.removeAll(newExecutorIds);
+        if (!removedExecutorIds.isEmpty()) {
+            String content = "任务已取消：" + task.getTitle();
+            Long currentUserId = LoginUserContext.getUserId();
+            for (Long executorId : removedExecutorIds) {
+                notificationService.saveNotification(executorId, currentUserId, "TASK_STATUS", content, task.getId());
+                NotificationMessage message = new NotificationMessage("TASK_STATUS", content, task.getId(), System.currentTimeMillis());
+                NotificationWebSocketHandler.sendMessage(executorId, message);
+                log.info("编辑任务时发送移除通知给 userId={}, taskId={}", executorId, task.getId());
+            }
+        }
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deleteTask(Long id) {
-        // 删除任务基本信息
-        taskMapper.deleteById(id);
-        // 删除任务-执行人关联
+        // 1. 获取任务信息（用于通知）
+        Task task = taskMapper.selectById(id);
+        if (task == null) {
+            throw new BusinessException("任务不存在");
+        }
+        // 2. 获取执行人列表
+        LambdaQueryWrapper<TaskExecutor> teQuery = new LambdaQueryWrapper<>();
+        teQuery.eq(TaskExecutor::getTaskId, id);
+        List<TaskExecutor> executors = taskExecutorMapper.selectList(teQuery);
+        // 3. 通知所有执行人任务已取消
+        if (!executors.isEmpty()) {
+            String content = "任务已取消：" + task.getTitle();
+            Long currentUserId = LoginUserContext.getUserId();
+            for (TaskExecutor te : executors) {
+                notificationService.saveNotification(te.getUserId(), currentUserId, "TASK_STATUS", content, id);
+                NotificationMessage message = new NotificationMessage("TASK_STATUS", content, id, System.currentTimeMillis());
+                NotificationWebSocketHandler.sendMessage(te.getUserId(), message);
+            }
+        }
+        // 4. 删除关联数据
         LambdaQueryWrapper<TaskExecutor> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(TaskExecutor::getTaskId, id);
         taskExecutorMapper.delete(wrapper);
+        // 删除任务已读状态
+        LambdaQueryWrapper<TaskReadStatus> readWrapper = new LambdaQueryWrapper<>();
+        readWrapper.eq(TaskReadStatus::getTaskId, id);
+        taskReadStatusMapper.delete(readWrapper);
+        // 删除任务评论
+        LambdaQueryWrapper<Comment> commentWrapper = new LambdaQueryWrapper<>();
+        commentWrapper.eq(Comment::getTaskId, id);
+        commentMapper.delete(commentWrapper);
+        // 5. 删除任务本身
+        taskMapper.deleteById(id);
     }
 
     @Override
@@ -244,10 +310,19 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
         task.setStatus(dto.getStatus());
         taskMapper.updateById(task);
 
-        String content = "任务状态已更新：" + task.getTitle();
-        notificationService.saveNotification(task.getCreatorId(), LoginUserContext.getUserId(), "TASK_STATUS", content, task.getId());
-        NotificationMessage message = new NotificationMessage("TASK_STATUS", content, task.getId(), System.currentTimeMillis());
-        NotificationWebSocketHandler.sendMessage(task.getCreatorId(), message);
+        // 项目动态：任务状态变更
+        String[] statusLabels = {"待办", "进行中", "已完成"};
+        String statusLabel = dto.getStatus() != null && dto.getStatus() >= 0 && dto.getStatus() < statusLabels.length
+                ? statusLabels[dto.getStatus()] : "未知";
+        ProjectActivity activity = new ProjectActivity();
+        activity.setProjectId(task.getProjectId());
+        activity.setUserId(LoginUserContext.getUserId());
+        activity.setType("TASK_STATUS");
+        activity.setContent(task.getTitle() + "任务已经" + statusLabel);
+        activity.setCreateTime(java.time.LocalDateTime.now());
+        projectActivityService.addActivity(activity);
+
+        // 状态变更只写入项目动态，不推通知中心
     }
 
     @Override
@@ -267,6 +342,16 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
         te.setTaskId(dto.getTaskId());
         te.setUserId(dto.getExecutorId());
         taskExecutorMapper.insert(te);
+
+        // 项目动态
+        User executor = userMapper.selectById(dto.getExecutorId());
+        String executorName = executor != null ? (executor.getNickname() != null ? executor.getNickname() : executor.getUsername()) : "未知";
+        ProjectActivity activity = new ProjectActivity();
+        activity.setProjectId(task.getProjectId());
+        activity.setUserId(LoginUserContext.getUserId());
+        activity.setType("TASK_ASSIGN");
+        activity.setContent("指派了任务「" + task.getTitle() + "」给 " + executorName);
+        projectActivityService.addActivity(activity);
 
         String content = "你被指派了新任务：" + task.getTitle();
         log.info("准备保存通知: receiverId={}, senderId={}, content={}", dto.getExecutorId(), LoginUserContext.getUserId(), content);

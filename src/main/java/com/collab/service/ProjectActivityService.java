@@ -15,4 +15,9 @@ public interface ProjectActivityService {
      * 项目动态列表
      */
     List<ProjectActivity> getList(Long projectId);
+
+    /**
+     * 删除动态
+     */
+    void removeById(Long id);
 }

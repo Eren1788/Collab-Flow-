@@ -19,6 +19,8 @@ public class ProjectVO {
 
     private Integer taskCount;
 
+    private Integer completedTaskCount;
+
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createTime;
 }

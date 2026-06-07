@@ -23,19 +23,15 @@ public class ProjectActivityServiceImpl implements ProjectActivityService {
 
     @Override
     public List<ProjectActivity> getList(Long projectId) {
-
         return projectActivityMapper.selectList(
-
                 new LambdaQueryWrapper<ProjectActivity>()
-
-                        .eq(
-                                ProjectActivity::getProjectId,
-                                projectId
-                        )
-
-                        .orderByDesc(
-                                ProjectActivity::getCreateTime
-                        )
+                        .eq(ProjectActivity::getProjectId, projectId)
+                        .orderByDesc(ProjectActivity::getCreateTime)
         );
+    }
+
+    @Override
+    public void removeById(Long id) {
+        projectActivityMapper.deleteById(id);
     }
 }

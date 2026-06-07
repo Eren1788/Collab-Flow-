@@ -279,6 +279,11 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
         wrapper.eq(Task::getProjectId, project.getId());
         Long taskCount = taskMapper.selectCount(wrapper);
         vo.setTaskCount(taskCount.intValue());
+        LambdaQueryWrapper<Task> doneWrapper = new LambdaQueryWrapper<>();
+        doneWrapper.eq(Task::getProjectId, project.getId());
+        doneWrapper.eq(Task::getStatus, 2);
+        Long completedCount = taskMapper.selectCount(doneWrapper);
+        vo.setCompletedTaskCount(completedCount.intValue());
         return vo;
     }
 }
