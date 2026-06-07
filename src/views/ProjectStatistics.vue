@@ -100,9 +100,8 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.statistics-container {
-  padding: 20px;
-}
+.statistics-container { padding: 0; }
+
 .page-header {
   display: flex;
   justify-content: space-between;
@@ -115,15 +114,17 @@ onMounted(() => {
   width: 100%;
 }
 .member-name {
-  font-weight: bold;
-  font-size: 16px;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--cf-text-heading);
   min-width: 100px;
 }
-.member-detail {
-  padding: 10px;
-}
+.member-detail { padding: 12px 0; }
 .task-summary {
-  margin-bottom: 15px;
-  color: #666;
+  margin-bottom: 16px;
+  color: var(--cf-text-secondary);
+  font-size: 14px;
 }
+
+:deep(.el-table) { border-radius: var(--cf-radius); overflow: hidden; }
 </style>

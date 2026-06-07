@@ -214,6 +214,9 @@
         >
           <el-card>
             <div class="activity-content">{{ item.content }}</div>
+            <el-button v-if="canManageActivity" link type="danger" size="small" @click.stop="deleteActivity(item.id)" style="float:right;padding:0">
+              <el-icon><Delete /></el-icon>删除
+            </el-button>
           </el-card>
         </el-timeline-item>
         <el-empty v-if="displayActivityList.length === 0" description="暂无动态" />
@@ -332,7 +335,7 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { User, UserFilled, Check } from '@element-plus/icons-vue'
+import { User, UserFilled, Check, Delete } from '@element-plus/icons-vue'
 import request from '../utils/request'
 import { addTaskApi, updateTaskApi, deleteTaskApi, updateTaskStatusApi } from '../api/task'
 import { useUserStore } from '../store/user'
@@ -347,6 +350,9 @@ const canManage = computed(() => {
   const info = userStore.info
   return info?.roleId === 1 || info?.roleName === '超级管理员' || info?.roleId === 2 || info?.roleName === '项目经理'
 })
+
+// 动态删除权限：同上
+const canManageActivity = computed(() => canManage.value)
 
 // 可接收疑问的用户（仅项目经理）
 const questionReceivers = computed(() => {
@@ -497,6 +503,17 @@ const loadActivityList = async () => {
   } catch (error) {
     console.error('加载项目动态失败', error)
     activityList.value = []
+  }
+}
+
+const deleteActivity = async (id: number) => {
+  try {
+    await ElMessageBox.confirm('确认删除该动态吗？', '提示', { type: 'warning' })
+    await request({ url: `/project/activity/delete/${id}`, method: 'delete' })
+    ElMessage.success('删除成功')
+    loadActivityList()
+  } catch (e) {
+    if (e !== 'cancel') ElMessage.error('删除失败')
   }
 }
 
@@ -652,25 +669,65 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* 样式与之前相同，此处省略，请保留原样式 */
-.detail-container { display: flex; flex-direction: column; gap: 20px; }
+.detail-container { display: flex; flex-direction: column; gap: 24px; }
+
 .header { display: flex; justify-content: space-between; align-items: flex-start; }
-.title { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
-.description { color: #666; }
-.statistics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
-.card-title { color: #999; margin-bottom: 15px; }
-.card-value { font-size: 32px; font-weight: bold; }
-.success { color: #67c23a; }
-.primary { color: #409eff; }
-.danger { color: #f56c6c; }
-.progress-header { display: flex; justify-content: space-between; margin-bottom: 15px; }
+.title { font-size: 24px; font-weight: 700; margin-bottom: 6px; color: var(--cf-text-heading); letter-spacing: -0.3px; }
+.description { color: var(--cf-text-secondary); font-size: 14px; line-height: 1.6; }
+
+.statistics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.statistics :deep(.el-card) { text-align: center; padding: 20px 0; border-radius: var(--cf-radius-md) !important; transition: var(--cf-transition-slow); }
+.statistics :deep(.el-card:hover) { transform: translateY(-3px); box-shadow: var(--cf-shadow-lg) !important; }
+.card-title { font-size: 13px; color: var(--cf-text-secondary); margin-bottom: 6px; letter-spacing: 0.3px; }
+.card-value { font-size: 32px; font-weight: 800; letter-spacing: -0.5px; }
+.success { color: var(--cf-success); }
+.primary { color: var(--cf-primary); }
+.danger { color: var(--cf-danger); }
+
+.progress-header { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px; color: var(--cf-text); }
+.progress-header span:last-child { font-weight: 700; color: var(--cf-primary); }
+
 .activity-header { display: flex; justify-content: space-between; align-items: center; }
-.activity-title { font-size: 18px; font-weight: bold; }
-.activity-content { line-height: 24px; }
-.card-header { display: flex; align-items: center; gap: 8px; font-weight: bold; }
-.my-member-card { margin-bottom: 0; border-left: 4px solid #409eff; }
-.task-toolbar { margin-bottom: 20px; display: flex; justify-content: flex-end; gap: 10px; }
-.my-tasks-section { margin-bottom: 24px; border: 1px solid #e6a23c; border-radius: 8px; padding: 12px; background-color: #fdf6ec; }
-.my-tasks-header { font-size: 16px; font-weight: bold; color: #e6a23c; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
-.all-tasks-header { font-size: 15px; font-weight: bold; color: #333; margin: 16px 0 12px 0; padding-left: 8px; border-left: 3px solid #409eff; }
+.activity-title { font-size: 16px; font-weight: 600; color: var(--cf-text-heading); }
+.activity-content { line-height: 1.6; font-size: 14px; display: inline; }
+
+.card-header { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; }
+
+.my-member-card { border-left: 3px solid var(--cf-primary) !important; }
+
+.task-toolbar { margin-bottom: 16px; display: flex; justify-content: flex-end; gap: 8px; }
+
+.my-tasks-section {
+  margin-bottom: 24px;
+  border: 1px solid #fde68a;
+  border-radius: var(--cf-radius-md);
+  padding: 20px;
+  background: linear-gradient(135deg, #fffbeb 0%, #fefce8 100%);
+}
+.my-tasks-header {
+  font-size: 15px;
+  font-weight: 600;
+  color: #d97706;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+:deep(.el-timeline-item__wrapper) { padding-left: 24px; }
+:deep(.el-timeline-item__node--normal) { width: 10px; height: 10px; left: -3px; }
+:deep(.el-timeline-item__tail) { border-left: 2px solid var(--cf-border); left: 3px; }
+:deep(.el-timeline-item) { padding-bottom: 20px; }
+
+.all-tasks-header {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cf-text-heading);
+  margin: 16px 0 12px;
+  padding-left: 10px;
+  border-left: 3px solid var(--cf-primary);
+}
+
+:deep(.el-table) { border-radius: var(--cf-radius); overflow: hidden; }
+:deep(.el-timeline) { padding-left: 16px; }
 </style>

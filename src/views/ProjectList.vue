@@ -227,7 +227,7 @@ const loadProjectList = async () => {
     })
     tableData.value = (res.data.records || []).map((item: any) => ({
       ...item,
-      progress: item.taskCount ? Math.min(item.taskCount * 10, 100) : 0
+      progress: item.taskCount ? Math.round((item.completedTaskCount || 0) / item.taskCount * 100) : 0
     }))
     total.value = res.data.total || 0
   } catch (error) {
@@ -335,6 +335,10 @@ const addMember = async () => {
     ElMessage.warning('只有管理员可以添加成员')
     return
   }
+  if (!memberForm.userId || !memberForm.userId.toString().trim()) {
+    ElMessage.warning('请输入要添加的用户ID')
+    return
+  }
   await request({
     url: '/project/member/add',
     method: 'post',
@@ -378,37 +382,23 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.project-container {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-.toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.left {
-  display: flex;
-  gap: 10px;
-}
-.pagination {
-  margin-top: 20px;
-  display: flex;
-  justify-content: flex-end;
-}
-.member-toolbar {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 20px;
-}
-.action-buttons {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-  margin: 4px 0;
-}
-.action-buttons .el-button {
-  margin: 0;
-}
+.project-container { display: flex; flex-direction: column; gap: 24px; }
+
+.toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+.left { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+.pagination { margin-top: 24px; display: flex; justify-content: flex-end; }
+.pagination :deep(.el-pager li) { border-radius: var(--cf-radius-sm); min-width: 32px; }
+.pagination :deep(.btn-prev), .pagination :deep(.btn-next) { border-radius: var(--cf-radius-sm); }
+
+.member-toolbar { display: flex; gap: 12px; margin-bottom: 20px; align-items: center; }
+
+.action-buttons { display: flex; justify-content: center; gap: 4px; margin: 2px 0; }
+.action-buttons .el-button { margin: 0; }
+
+:deep(.el-table) { border-radius: var(--cf-radius-md); overflow: hidden; }
+:deep(.el-table td) { padding: 10px 0; }
+:deep(.el-table th.el-table__cell) { padding: 10px 0; }
+
+:deep(.el-card) { transition: var(--cf-transition-slow); }
 </style>

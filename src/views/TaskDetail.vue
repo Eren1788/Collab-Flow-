@@ -231,50 +231,51 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.detail-container {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
+.detail-container { display: flex; flex-direction: column; gap: 20px; }
+
 .header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
 }
 .title {
-  font-size: 28px;
-  font-weight: bold;
-  margin-bottom: 15px;
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: var(--cf-text-heading);
 }
 .content {
-  color: #666;
-  line-height: 28px;
+  color: var(--cf-text-secondary);
+  line-height: 1.7;
 }
+
 .statistics {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+}
+.statistics :deep(.el-card) {
+  text-align: center;
+  padding: 12px 0;
 }
 .label {
-  color: #999;
-  margin-bottom: 15px;
+  font-size: 13px;
+  color: var(--cf-text-secondary);
+  margin-bottom: 8px;
 }
 .value {
-  font-size: 20px;
-  font-weight: bold;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--cf-text-heading);
 }
+
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
-.hint-text {
-  font-size: 12px;
-  color: #909399;
-}
-.file-upload {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 10px;
-}
+.hint-text { font-size: 12px; color: var(--cf-text-muted); }
+.file-upload { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+
+:deep(.el-table) { border-radius: var(--cf-radius); overflow: hidden; }
 </style>

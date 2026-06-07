@@ -2,40 +2,24 @@
   <div class="task-container">
 
     <!-- 统计卡片：仅超级管理员可见 -->
-    <el-row :gutter="20" v-if="isSuperAdmin">
-      <el-col :span="6">
-        <el-card shadow="hover" class="stat-card" :class="{ active: activeStat === 'total' }" @click="filterByStatus('total')">
-          <div class="stat-card-inner">
-            <div class="title">任务总数</div>
-            <div class="value">{{ statistics.total || 0 }}</div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover" class="stat-card" :class="{ active: activeStat === 'doing' }" @click="filterByStatus('doing')">
-          <div class="stat-card-inner">
-            <div class="title">进行中</div>
-            <div class="value">{{ statistics.doing || 0 }}</div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover" class="stat-card" :class="{ active: activeStat === 'done' }" @click="filterByStatus('done')">
-          <div class="stat-card-inner">
-            <div class="title">已完成</div>
-            <div class="value">{{ statistics.done || 0 }}</div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover" class="stat-card" :class="{ active: activeStat === 'expired' }" @click="filterByStatus('expired')">
-          <div class="stat-card-inner">
-            <div class="title">已逾期</div>
-            <div class="value">{{ statistics.expired || 0 }}</div>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
+    <div class="cf-stat-grid" v-if="isSuperAdmin">
+      <el-card shadow="hover" class="cf-stat-card" :class="{ active: activeStat === 'total' }" @click="filterByStatus('total')">
+        <div class="cf-stat-label">任务总数</div>
+        <div class="cf-stat-value">{{ statistics.total || 0 }}</div>
+      </el-card>
+      <el-card shadow="hover" class="cf-stat-card" :class="{ active: activeStat === 'doing' }" @click="filterByStatus('doing')">
+        <div class="cf-stat-label">进行中</div>
+        <div class="cf-stat-value is-primary">{{ statistics.doing || 0 }}</div>
+      </el-card>
+      <el-card shadow="hover" class="cf-stat-card" :class="{ active: activeStat === 'done' }" @click="filterByStatus('done')">
+        <div class="cf-stat-label">已完成</div>
+        <div class="cf-stat-value is-success">{{ statistics.done || 0 }}</div>
+      </el-card>
+      <el-card shadow="hover" class="cf-stat-card" :class="{ active: activeStat === 'expired' }" @click="filterByStatus('expired')">
+        <div class="cf-stat-label">已逾期</div>
+        <div class="cf-stat-value is-danger">{{ statistics.expired || 0 }}</div>
+      </el-card>
+    </div>
 
     <!-- 搜索区域 -->
     <el-card shadow="never">
@@ -137,7 +121,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import request from '../utils/request'
 import { getTaskPageApi } from '../api/task'
@@ -156,7 +140,6 @@ interface TaskItem {
 }
 
 const route = useRoute()
-const router = useRouter()
 const userStore = useUserStore()
 
 // 判断当前用户是否是超级管理员
@@ -316,49 +299,18 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.task-container {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-.stat-card {
-  cursor: pointer;
-  transition: all 0.3s;
-}
-.stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-}
-.stat-card.active {
-  border: 2px solid #409eff;
-  background-color: #ecf5ff;
-}
-.stat-card-inner {
-  text-align: center;
-}
-.stat-card .title {
-  color: #999;
-  margin-bottom: 10px;
-}
-.stat-card .value {
-  font-size: 30px;
-  font-weight: bold;
-  color: #409EFF;
-}
-.toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.left {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-.pagination {
-  margin-top: 20px;
-  display: flex;
-  justify-content: flex-end;
-}
+.task-container { display: flex; flex-direction: column; gap: 24px; }
+
+:deep(.el-table) { border-radius: var(--cf-radius-md); overflow: hidden; }
+:deep(.el-table td) { padding: 10px 0; }
+:deep(.el-table th.el-table__cell) { padding: 10px 0; }
+
+.toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+.left { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+.pagination { margin-top: 24px; display: flex; justify-content: flex-end; }
+.pagination :deep(.el-pager li) { border-radius: var(--cf-radius-sm); min-width: 32px; }
+.pagination :deep(.btn-prev), .pagination :deep(.btn-next) { border-radius: var(--cf-radius-sm); }
+
+:deep(.el-card) { transition: var(--cf-transition-slow); }
 </style>

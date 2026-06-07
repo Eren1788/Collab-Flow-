@@ -1,37 +1,5 @@
 <template>
   <div class="user-container">
-    <!-- 搜索区域 -->
-    <el-card class="search-card">
-      <div class="search-bar">
-        <el-input
-          v-model="searchForm.username"
-          placeholder="请输入用户名"
-          clearable
-          style="width: 300px"
-        />
-        <el-button type="primary" @click="loadUserList">
-          搜索
-        </el-button>
-        <!-- 优化后的欢迎语区域 -->
-        <div class="welcome-info">
-          <div class="welcome-icons">
-            <el-icon class="icon-smile"><Sunny /></el-icon>
-            <el-icon class="icon-gift"><Present /></el-icon>
-          </div>
-          <div class="welcome-text">
-            <span>欢迎使用 Collab Flow</span>
-            <span class="user-badge">
-              <el-icon><User /></el-icon>
-              {{ currentUserDisplay }} ({{ currentUserRole }})
-            </span>
-          </div>
-          <div class="welcome-icons">
-            <el-icon class="icon-star"><Star /></el-icon>
-          </div>
-        </div>
-      </div>
-    </el-card>
-
     <!-- 当前用户个人信息卡片（置顶显示） -->
     <el-card class="my-info-card" shadow="hover" v-if="myInfo">
       <template #header>
@@ -60,6 +28,21 @@
           <el-descriptions-item label="邮箱">{{ myInfo.email || '-' }}</el-descriptions-item>
           <el-descriptions-item label="手机号">{{ myInfo.phone || '-' }}</el-descriptions-item>
         </el-descriptions>
+      </div>
+    </el-card>
+
+    <!-- 搜索区域 -->
+    <el-card class="search-card">
+      <div class="search-bar">
+        <el-input
+          v-model="searchForm.username"
+          placeholder="请输入用户名"
+          clearable
+          style="width: 300px"
+        />
+        <el-button type="primary" @click="loadUserList">
+          搜索
+        </el-button>
       </div>
     </el-card>
 
@@ -148,7 +131,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { User, Sunny, Present, Star } from '@element-plus/icons-vue'  // 新增图标
+import { User } from '@element-plus/icons-vue'
 import {
   getUserPageApi,
   deleteUserApi,
@@ -165,19 +148,6 @@ const userStore = useUserStore()
 const isSuperAdmin = computed(() => {
   const info = userStore.info
   return info?.roleId === 1 || info?.roleName === '超级管理员'
-})
-
-const currentUserDisplay = computed(() => {
-  const info = userStore.info
-  if (info?.nickname) return info.nickname
-  if (info?.username) return info.username
-  return '未知用户'
-})
-
-const currentUserRole = computed(() => {
-  const info = userStore.info
-  if (info?.roleName) return info.roleName
-  return '用户'
 })
 
 const myInfo = computed(() => userStore.info)
@@ -326,100 +296,22 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.user-container { padding: 20px }
-.search-card { margin-bottom: 20px }
+.user-container { padding: 0; }
+
+.search-card { margin-bottom: 24px; }
 .search-bar { 
   display: flex; 
   align-items: center; 
-  gap: 20px;
-  flex-wrap: wrap;
-}
-
-/* 优化后的欢迎语样式 */
-.welcome-info {
-  display: flex;
-  align-items: center;
   gap: 12px;
-  background: linear-gradient(135deg, #f0f9ff 0%, #e6f4ff 100%);
-  padding: 8px 20px;
-  border-radius: 40px;
-  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.15);
-  border: 1px solid rgba(64, 158, 255, 0.2);
-  transition: all 0.3s;
-}
-.welcome-info:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.25);
-}
-.welcome-icons {
-  display: flex;
-  gap: 6px;
-}
-.icon-smile {
-  font-size: 22px;
-  color: #ffaa00;
-  animation: bounce 2s infinite;
-}
-.icon-gift {
-  font-size: 22px;
-  color: #ff6b6b;
-  animation: swing 2s infinite;
-}
-.icon-star {
-  font-size: 22px;
-  color: #ffc107;
-  animation: pulse 1.5s infinite;
-}
-.welcome-text {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  line-height: 1.4;
-}
-.welcome-text span:first-child {
-  font-size: 14px;
-  font-weight: 500;
-  color: #409eff;
-  letter-spacing: 1px;
-}
-.user-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: white;
-  padding: 4px 12px;
-  border-radius: 30px;
-  margin-top: 4px;
-  font-size: 13px;
-  font-weight: bold;
-  color: #333;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
-.user-badge .el-icon {
-  color: #409eff;
+  flex-wrap: wrap;
+  justify-content: flex-start;
 }
 
-@keyframes bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
-}
-@keyframes swing {
-  0%, 100% { transform: rotate(0deg); }
-  50% { transform: rotate(10deg); }
-}
-@keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.7; transform: scale(1.1); }
-}
-
-.welcome-info .el-icon {
-  font-size: 16px;
-}
-
-/* 其他样式保持不变 */
+/* 我的信息卡片 */
 .my-info-card {
-  margin-bottom: 20px;
-  border-left: 4px solid #409eff;
+  margin-bottom: 24px;
+  border-left: 3px solid var(--cf-primary) !important;
+  border-radius: var(--cf-radius-md) !important;
 }
 .card-header {
   display: flex;
@@ -427,16 +319,17 @@ onMounted(() => {
   align-items: center;
 }
 .card-header span {
-  font-size: 16px;
-  font-weight: bold;
+  font-size: 15px;
+  font-weight: 600;
   display: flex;
   align-items: center;
   gap: 6px;
+  color: var(--cf-text-heading);
 }
 .avatar-section {
   display: flex;
   align-items: flex-start;
-  gap: 30px;
+  gap: 28px;
   flex-wrap: wrap;
 }
 .avatar-uploader {
@@ -448,17 +341,23 @@ onMounted(() => {
   height: 80px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid #409eff;
-  transition: all 0.3s;
+  border: 3px solid var(--cf-primary-border);
+  transition: var(--cf-transition);
 }
 .user-avatar:hover { opacity: 0.8; }
 .avatar-tip {
   font-size: 12px;
-  color: #909399;
+  color: var(--cf-text-muted);
   margin-top: 8px;
 }
 .user-info-desc { flex: 1; }
-.employee-list-title {
-  margin: 8px 0 16px 0;
-}
+
+.employee-list-title { margin: 4px 0 12px 0; }
+
+/* 表格内标签美化 */
+:deep(.el-table) { border-radius: var(--cf-radius-md); overflow: hidden; }
+:deep(.el-table td) { padding: 10px 0; }
+:deep(.el-table th.el-table__cell) { padding: 10px 0; }
+
+:deep(.el-card) { transition: var(--cf-transition-slow); }
 </style>
